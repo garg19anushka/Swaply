@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/auth_service.dart';
-import '../../utils/app_theme.dart';
+import '../../widgets/swaply_logo.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,10 +16,19 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _emailFocus    = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _obscure  = true;
   bool _loading  = false;
-  String? _error;
 
+  // Per-field validation errors
+  String? _emailError;
+  String? _passwordError;
+  // Auth-level error (wrong credentials etc.)
+  String? _authError;
+
+  // ── Palette ─────────────────────────────────────────────────────────────
   static const _bg       = Color(0xFF0D0E17);
   static const _cardBg   = Color(0xFF161824);
   static const _inputBg  = Color(0xFF1C1D2A);
@@ -29,26 +37,87 @@ class _LoginScreenState extends State<LoginScreen> {
   static const _textMain = Color(0xFFFFFFFF);
   static const _textSub  = Color(0xFF8E90A8);
   static const _textHint = Color(0xFF545670);
+  static const _errorRed = Color(0xFFFF5C6A);
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild on focus change so border colour updates live
+    _emailFocus.addListener(() => setState(() {}));
+    _passwordFocus.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
+  // ── Validation ───────────────────────────────────────────────────────────
+  bool _validate() {
+    bool ok = true;
+    setState(() {
+      _emailError    = null;
+      _passwordError = null;
+      _authError     = null;
+
+      final email = _emailCtrl.text.trim();
+      if (email.isEmpty) {
+        _emailError = 'Please enter your email';
+        ok = false;
+      } else if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+        _emailError = 'Enter a valid email address';
+        ok = false;
+      }
+
+      if (_passwordCtrl.text.isEmpty) {
+        _passwordError = 'Please enter your password';
+        ok = false;
+      } else if (_passwordCtrl.text.length < 6) {
+        _passwordError = 'Password must be at least 6 characters';
+        ok = false;
+      }
+    });
+    return ok;
+  }
+
   Future<void> _signIn() async {
-    setState(() { _loading = true; _error = null; });
+    // Clear keyboard
+    FocusScope.of(context).unfocus();
+
+    if (!_validate()) return;
+
+    setState(() { _loading = true; _authError = null; });
     try {
       await context.read<AuthService>().signIn(
-        email: _emailCtrl.text.trim(),
+        email:    _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
+      // Navigation handled by AuthService listener — no pop needed here
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _authError = _friendlyError(e.toString());
+          _loading   = false;
+        });
+      }
     }
   }
 
+  String _friendlyError(String raw) {
+    if (raw.contains('invalid') || raw.contains('credentials') || raw.contains('password'))
+      return 'Invalid email or password. Please try again.';
+    if (raw.contains('network') || raw.contains('socket'))
+      return 'No internet connection. Please check your network.';
+    if (raw.contains('too many'))
+      return 'Too many attempts. Please wait a moment and try again.';
+    return 'Sign in failed. Please try again.';
+  }
+
+  // ── UI ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -90,66 +159,29 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  LOGO — S with swap arrows, blue-purple gradient matching the image
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Logo ─────────────────────────────────────────────────────────────────
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 80, height: 80,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF3D5AFE), Color(0xFF6C63FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF3D5AFE).withOpacity(0.45),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Center(
-            child: SizedBox(
-              width: 52, height: 52,
-              child: CustomPaint(painter: _SwaplyLogoPainter()),
-            ),
-          ),
-        ),
+        const SwaplyLogoWidget(size: 88),
         const SizedBox(height: 16),
-        Text(
-          'Swaply',
+        Text('Swaply',
           style: GoogleFonts.dmSans(
-            color: _textMain,
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-          ),
-        ),
+            color: _textMain, fontSize: 28,
+            fontWeight: FontWeight.w800, letterSpacing: -0.5,
+          )),
         const SizedBox(height: 4),
-        Text(
-          'Campus Skill Barter',
-          style: GoogleFonts.dmSans(
-            color: _textSub,
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
+        Text('Campus Skill Barter',
+          style: GoogleFonts.dmSans(color: _textSub, fontSize: 14)),
       ],
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  CARD
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Card ─────────────────────────────────────────────────────────────────
   Widget _buildCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(24),
@@ -158,33 +190,37 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Welcome back',
+          Text('Welcome back',
             style: GoogleFonts.dmSans(
               color: _textMain, fontSize: 22,
               fontWeight: FontWeight.w800, letterSpacing: -0.3,
-            ),
-          ),
+            )),
           const SizedBox(height: 4),
-          Text(
-            'Sign in to your account',
-            style: GoogleFonts.dmSans(color: _textSub, fontSize: 14),
-          ),
+          Text('Sign in to your account',
+            style: GoogleFonts.dmSans(color: _textSub, fontSize: 14)),
           const SizedBox(height: 22),
 
+          // Email field
           _inputField(
             ctrl: _emailCtrl,
+            focus: _emailFocus,
             hint: 'Email',
             icon: Icons.mail_outline_rounded,
             type: TextInputType.emailAddress,
+            error: _emailError,
+            onChanged: (_) { if (_emailError != null) setState(() => _emailError = null); },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
+          // Password field
           _inputField(
             ctrl: _passwordCtrl,
+            focus: _passwordFocus,
             hint: 'Password',
             icon: Icons.lock_outline_rounded,
             obscure: _obscure,
+            error: _passwordError,
+            onChanged: (_) { if (_passwordError != null) setState(() => _passwordError = null); },
             trailing: GestureDetector(
               onTap: () => setState(() => _obscure = !_obscure),
               child: Padding(
@@ -196,6 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 6),
 
           // Forgot password
           Align(
@@ -203,32 +240,21 @@ class _LoginScreenState extends State<LoginScreen> {
             child: TextButton(
               onPressed: () {},
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.only(top: 6, bottom: 2),
+                padding: const EdgeInsets.only(top: 4, bottom: 2),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(
-                'Forgot password?',
+              child: Text('Forgot password?',
                 style: GoogleFonts.dmSans(
                   color: _purple, fontSize: 13, fontWeight: FontWeight.w600,
-                ),
-              ),
+                )),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          // Error
-          if (_error != null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.25)),
-              ),
-              child: Text(_error!, style: GoogleFonts.dmSans(color: Colors.redAccent, fontSize: 12)),
-            ),
+          // Auth-level error banner
+          if (_authError != null) ...[
+            _errorBanner(_authError!),
             const SizedBox(height: 14),
           ],
 
@@ -238,65 +264,129 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  INPUT FIELD — fixed, clean, no overflow
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Input field ───────────────────────────────────────────────────────────
   Widget _inputField({
     required TextEditingController ctrl,
+    required FocusNode focus,
     required String hint,
     required IconData icon,
     bool obscure = false,
     Widget? trailing,
     TextInputType? type,
+    String? error,
+    ValueChanged<String>? onChanged,
   }) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: _inputBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border, width: 1.2),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const SizedBox(width: 16),
-          Icon(icon, color: _textHint, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: ctrl,
-              obscureText: obscure,
-              keyboardType: type,
-              style: GoogleFonts.dmSans(
-                color: _textMain,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+    final focused = focus.hasFocus;
+    final hasError = error != null;
+
+    Color borderColor;
+    if (hasError)       borderColor = _errorRed;
+    else if (focused)   borderColor = _purple;
+    else                borderColor = _border;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 56,
+          decoration: BoxDecoration(
+            color: _inputBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: borderColor,
+              width: hasError || focused ? 1.6 : 1.2,
+            ),
+            boxShadow: focused ? [
+              BoxShadow(
+                color: _purple.withOpacity(0.15),
+                blurRadius: 8,
+                spreadRadius: 0,
               ),
-              cursorColor: _purple,
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: GoogleFonts.dmSans(
-                  color: _textHint,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
+            ] : [],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(width: 16),
+              Icon(icon,
+                color: hasError ? _errorRed : (focused ? _purple : _textHint),
+                size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: ctrl,
+                  focusNode: focus,
+                  obscureText: obscure,
+                  keyboardType: type,
+                  onChanged: onChanged,
+                  style: GoogleFonts.dmSans(
+                    color: _textMain, fontSize: 15, fontWeight: FontWeight.w500,
+                  ),
+                  cursorColor: _purple,
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    hintStyle: GoogleFonts.dmSans(
+                      color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
               ),
+              if (trailing != null) trailing,
+            ],
+          ),
+        ),
+        if (hasError) ...[
+          const SizedBox(height: 5),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: _errorRed, size: 13),
+                const SizedBox(width: 4),
+                Text(error,
+                  style: GoogleFonts.dmSans(
+                    color: _errorRed, fontSize: 12, fontWeight: FontWeight.w500,
+                  )),
+              ],
             ),
           ),
-          if (trailing != null) trailing,
+        ],
+      ],
+    );
+  }
+
+  // ── Error banner ──────────────────────────────────────────────────────────
+  Widget _errorBanner(String msg) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: _errorRed.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _errorRed.withOpacity(0.30)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: _errorRed, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(msg,
+              style: GoogleFonts.dmSans(
+                color: _errorRed, fontSize: 13, fontWeight: FontWeight.w500,
+              )),
+          ),
         ],
       ),
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  SIGN IN BUTTON — gradient unchanged, login icon added
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Sign In button ────────────────────────────────────────────────────────
   Widget _buildSignInBtn() {
     return SizedBox(
       width: double.infinity,
@@ -304,15 +394,15 @@ class _LoginScreenState extends State<LoginScreen> {
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF7B6CF6), Color(0xFF6657E8)],
+            colors: [Color(0xFF7B6CF6), Color(0xFF5A4EE0)],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: _purple.withOpacity(0.35),
-              blurRadius: 16,
+              color: _purple.withOpacity(0.40),
+              blurRadius: 18,
               offset: const Offset(0, 6),
             ),
           ],
@@ -322,26 +412,24 @@ class _LoginScreenState extends State<LoginScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor:     Colors.transparent,
+            disabledBackgroundColor: Colors.transparent,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           child: _loading
               ? const SizedBox(
                   width: 22, height: 22,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(Icons.login_rounded, color: Colors.white, size: 20),
                     const SizedBox(width: 8),
-                    Text(
-                      'Sign In',
+                    Text('Sign In',
                       style: GoogleFonts.dmSans(
                         color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                        fontSize: 16, fontWeight: FontWeight.w700,
+                      )),
                   ],
                 ),
         ),
@@ -349,122 +437,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  SIGN UP LINK
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Sign up link ──────────────────────────────────────────────────────────
   Widget _buildSignupLink() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          "Don't have an account? ",
-          style: GoogleFonts.dmSans(color: _textSub, fontSize: 14),
-        ),
+        Text("Don't have an account? ",
+          style: GoogleFonts.dmSans(color: _textSub, fontSize: 14)),
         GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SignupScreen()),
-          ),
-          child: Text(
-            'Sign up',
+          onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const SignupScreen())),
+          child: Text('Sign up',
             style: GoogleFonts.dmSans(
               color: _purple, fontSize: 14, fontWeight: FontWeight.w700,
-            ),
-          ),
+            )),
         ),
       ],
     );
   }
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-//  CUSTOM PAINTER — draws the S + double swap arrows logo
-//  Matches the image: stylized S body with a right arrow (top)
-//  and left arrow (bottom) piercing through it
-// ══════════════════════════════════════════════════════════════════════════
-class _SwaplyLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.10
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final fillPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    // ── S body ────────────────────────────────────────────────────────────
-    // Top arc of S (curves right-to-left at top)
-    final topPath = Path();
-    topPath.moveTo(w * 0.72, h * 0.18);
-    topPath.cubicTo(
-      w * 0.72, h * 0.06,
-      w * 0.28, h * 0.06,
-      w * 0.28, h * 0.28,
-    );
-    topPath.cubicTo(
-      w * 0.28, h * 0.44,
-      w * 0.72, h * 0.44,
-      w * 0.72, h * 0.50,
-    );
-    canvas.drawPath(topPath, paint);
-
-    // Bottom arc of S (curves left-to-right at bottom)
-    final bottomPath = Path();
-    bottomPath.moveTo(w * 0.28, h * 0.82);
-    bottomPath.cubicTo(
-      w * 0.28, h * 0.94,
-      w * 0.72, h * 0.94,
-      w * 0.72, h * 0.72,
-    );
-    bottomPath.cubicTo(
-      w * 0.72, h * 0.56,
-      w * 0.28, h * 0.56,
-      w * 0.28, h * 0.50,
-    );
-    canvas.drawPath(bottomPath, paint);
-
-    // ── Top right arrow (pointing right, at ~35% height) ──────────────────
-    final arrowPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.09
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // Arrow shaft — horizontal line going right through top of S
-    canvas.drawLine(
-      Offset(w * 0.10, h * 0.32),
-      Offset(w * 0.82, h * 0.32),
-      arrowPaint,
-    );
-    // Arrowhead pointing right
-    final arrowHeadR = Path();
-    arrowHeadR.moveTo(w * 0.76, h * 0.20);
-    arrowHeadR.lineTo(w * 0.90, h * 0.32);
-    arrowHeadR.lineTo(w * 0.76, h * 0.44);
-    canvas.drawPath(arrowHeadR, arrowPaint);
-
-    // ── Bottom left arrow (pointing left, at ~68% height) ─────────────────
-    // Arrow shaft — horizontal line going left through bottom of S
-    canvas.drawLine(
-      Offset(w * 0.90, h * 0.68),
-      Offset(w * 0.18, h * 0.68),
-      arrowPaint,
-    );
-    // Arrowhead pointing left
-    final arrowHeadL = Path();
-    arrowHeadL.moveTo(w * 0.24, h * 0.56);
-    arrowHeadL.lineTo(w * 0.10, h * 0.68);
-    arrowHeadL.lineTo(w * 0.24, h * 0.80);
-    canvas.drawPath(arrowHeadL, arrowPaint);
-  }
-
-  @override
-  bool shouldRepaint(_SwaplyLogoPainter oldDelegate) => false;
 }

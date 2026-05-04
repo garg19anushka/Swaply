@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-import '../../utils/app_theme.dart';
+import '../../widgets/swaply_logo.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -17,40 +17,104 @@ class _SignupScreenState extends State<SignupScreen> {
   final _usernameCtrl = TextEditingController();
   final _emailCtrl    = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
+  final _nameFocus     = FocusNode();
+  final _usernameFocus = FocusNode();
+  final _emailFocus    = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _obscure  = true;
   bool _loading  = false;
-  String? _error;
+  String? _authError;
 
-  // ── Colors matching image 2 exactly ────────────────────────────────────
-  static const _bg         = Color(0xFF0D0E17); // body bg — dark navy
-  static const _cardBg     = Color(0xFF161824); // card bg
-  static const _inputBg    = Color(0xFF1C1D2A); // input bg
-  static const _border     = Color(0xFF2E3048); // input border
-  static const _purple     = Color(0xFF6C63FF);
-  static const _headerTop  = Color(0xFF7B72FF); // header gradient top
-  static const _headerBot  = Color(0xFF5A4EE0); // header gradient bottom
-  static const _textMain   = Color(0xFFFFFFFF);
-  static const _textSub    = Color(0xFFD0CFFF); // white/lavender on purple header
-  static const _textHint   = Color(0xFF545670);
+  // Per-field errors
+  String? _nameError;
+  String? _usernameError;
+  String? _emailError;
+  String? _passwordError;
+
+  // ── Palette ─────────────────────────────────────────────────────────────
+  static const _bg        = Color(0xFF0D0E17);
+  static const _cardBg    = Color(0xFF161824);
+  static const _inputBg   = Color(0xFF1C1D2A);
+  static const _border    = Color(0xFF2E3048);
+  static const _purple    = Color(0xFF6C63FF);
+  static const _headerTop = Color(0xFF7B72FF);
+  static const _headerBot = Color(0xFF5A4EE0);
+  static const _textMain  = Color(0xFFFFFFFF);
+  static const _textSub   = Color(0xFF8E90A8);
+  static const _textHint  = Color(0xFF545670);
+  static const _errorRed  = Color(0xFFFF5C6A);
+
+  @override
+  void initState() {
+    super.initState();
+    _nameFocus.addListener(()     => setState(() {}));
+    _usernameFocus.addListener(() => setState(() {}));
+    _emailFocus.addListener(()    => setState(() {}));
+    _passwordFocus.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _usernameCtrl.dispose();
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
+    _nameCtrl.dispose(); _usernameCtrl.dispose();
+    _emailCtrl.dispose(); _passwordCtrl.dispose();
+    _nameFocus.dispose(); _usernameFocus.dispose();
+    _emailFocus.dispose(); _passwordFocus.dispose();
     super.dispose();
   }
 
+  // ── Validation ───────────────────────────────────────────────────────────
+  bool _validate() {
+    bool ok = true;
+    setState(() {
+      _nameError = _usernameError = _emailError = _passwordError = _authError = null;
+
+      if (_nameCtrl.text.trim().isEmpty) {
+        _nameError = 'Please enter your full name';
+        ok = false;
+      } else if (_nameCtrl.text.trim().length < 2) {
+        _nameError = 'Name must be at least 2 characters';
+        ok = false;
+      }
+
+      final username = _usernameCtrl.text.trim();
+      if (username.isEmpty) {
+        _usernameError = 'Please enter a username';
+        ok = false;
+      } else if (username.length < 3) {
+        _usernameError = 'Username must be at least 3 characters';
+        ok = false;
+      } else if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) {
+        _usernameError = 'Only letters, numbers and underscores allowed';
+        ok = false;
+      }
+
+      final email = _emailCtrl.text.trim();
+      if (email.isEmpty) {
+        _emailError = 'Please enter your email';
+        ok = false;
+      } else if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+        _emailError = 'Enter a valid email address';
+        ok = false;
+      }
+
+      if (_passwordCtrl.text.isEmpty) {
+        _passwordError = 'Please enter a password';
+        ok = false;
+      } else if (_passwordCtrl.text.length < 6) {
+        _passwordError = 'Password must be at least 6 characters';
+        ok = false;
+      }
+    });
+    return ok;
+  }
+
   Future<void> _createAccount() async {
-    if (_nameCtrl.text.trim().isEmpty ||
-        _usernameCtrl.text.trim().isEmpty ||
-        _emailCtrl.text.trim().isEmpty ||
-        _passwordCtrl.text.isEmpty) {
-      setState(() => _error = 'Please fill in all fields.');
-      return;
-    }
-    setState(() { _loading = true; _error = null; });
+    FocusScope.of(context).unfocus();
+    if (!_validate()) return;
+
+    setState(() { _loading = true; _authError = null; });
     try {
       await context.read<AuthService>().signUp(
         email:    _emailCtrl.text.trim(),
@@ -59,15 +123,30 @@ class _SignupScreenState extends State<SignupScreen> {
         fullName: _nameCtrl.text.trim(),
       );
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _authError = _friendlyError(e.toString());
+          _loading   = false;
+        });
+      }
     }
   }
 
+  String _friendlyError(String raw) {
+    if (raw.contains('already') || raw.contains('exists') || raw.contains('taken'))
+      return 'This email or username is already registered.';
+    if (raw.contains('network') || raw.contains('socket'))
+      return 'No internet connection. Please check your network.';
+    if (raw.contains('weak') || raw.contains('password'))
+      return 'Password is too weak. Please choose a stronger one.';
+    return 'Account creation failed. Please try again.';
+  }
+
+  // ── UI ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        // Header is purple — use light icons on top of it
         statusBarColor:              Color(0xFF7B72FF),
         statusBarIconBrightness:     Brightness.light,
         statusBarBrightness:         Brightness.dark,
@@ -78,13 +157,11 @@ class _SignupScreenState extends State<SignupScreen> {
         backgroundColor: _bg,
         body: Column(
           children: [
-            // ── Purple header (extends under status bar) ───────────────
             _buildHeader(context),
-
-            // ── Scrollable card + content ──────────────────────────────
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 32),
                 child: _buildCard(),
               ),
             ),
@@ -94,17 +171,12 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  HEADER — purple gradient, extends under status bar
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Header ────────────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.only(
-        top: topPad + 14,
-        left: 20, right: 20, bottom: 26,
-      ),
+      padding: EdgeInsets.only(top: topPad + 14, left: 20, right: 20, bottom: 26),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [_headerTop, _headerBot],
@@ -115,7 +187,6 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Back button
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
@@ -124,42 +195,39 @@ class _SignupScreenState extends State<SignupScreen> {
                 color: Colors.white.withOpacity(0.18),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
-                Icons.chevron_left_rounded,
-                color: Colors.white, size: 24,
-              ),
+              child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 24),
             ),
           ),
           const SizedBox(height: 16),
-
-          Text(
-            'Create Account',
-            style: GoogleFonts.dmSans(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Join the campus skill community',
-            style: GoogleFonts.dmSans(
-              color: Colors.white.withOpacity(0.75),
-              fontSize: 14,
-            ),
+          Row(
+            children: [
+              const SwaplyLogoWidget(size: 44),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Create Account',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white, fontSize: 24,
+                      fontWeight: FontWeight.w800, letterSpacing: -0.5,
+                    )),
+                  Text('Join the campus skill community',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white.withOpacity(0.75), fontSize: 13,
+                    )),
+                ],
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  CARD
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Card ─────────────────────────────────────────────────────────────────
   Widget _buildCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: BoxDecoration(
         color: _cardBg,
@@ -168,21 +236,37 @@ class _SignupScreenState extends State<SignupScreen> {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 4),
-
-          _field(ctrl: _nameCtrl,     hint: 'Full Name', icon: Icons.person_outline_rounded),
-          const SizedBox(height: 10),
-          _field(ctrl: _usernameCtrl, hint: 'Username',  icon: Icons.alternate_email_rounded),
-          const SizedBox(height: 10),
-          _field(ctrl: _emailCtrl,    hint: 'Email',     icon: Icons.mail_outline_rounded, type: TextInputType.emailAddress),
-          const SizedBox(height: 10),
-
-          // Password with toggle
           _field(
-            ctrl: _passwordCtrl,
-            hint: 'Password',
-            icon: Icons.lock_outline_rounded,
+            ctrl: _nameCtrl, focus: _nameFocus,
+            hint: 'Full Name', icon: Icons.person_outline_rounded,
+            error: _nameError,
+            onChanged: (_) { if (_nameError != null) setState(() => _nameError = null); },
+          ),
+          const SizedBox(height: 12),
+
+          _field(
+            ctrl: _usernameCtrl, focus: _usernameFocus,
+            hint: 'Username', icon: Icons.alternate_email_rounded,
+            error: _usernameError,
+            onChanged: (_) { if (_usernameError != null) setState(() => _usernameError = null); },
+          ),
+          const SizedBox(height: 12),
+
+          _field(
+            ctrl: _emailCtrl, focus: _emailFocus,
+            hint: 'Email', icon: Icons.mail_outline_rounded,
+            type: TextInputType.emailAddress,
+            error: _emailError,
+            onChanged: (_) { if (_emailError != null) setState(() => _emailError = null); },
+          ),
+          const SizedBox(height: 12),
+
+          _field(
+            ctrl: _passwordCtrl, focus: _passwordFocus,
+            hint: 'Password', icon: Icons.lock_outline_rounded,
             obscure: _obscure,
+            error: _passwordError,
+            onChanged: (_) { if (_passwordError != null) setState(() => _passwordError = null); },
             suffix: GestureDetector(
               onTap: () => setState(() => _obscure = !_obscure),
               child: Padding(
@@ -196,83 +280,137 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Error banner
-          if (_error != null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.red.withOpacity(0.25)),
-              ),
-              child: Text(
-                _error!,
-                style: GoogleFonts.dmSans(color: Colors.redAccent, fontSize: 12),
-              ),
-            ),
+          // Auth-level error
+          if (_authError != null) ...[
+            _errorBanner(_authError!),
             const SizedBox(height: 14),
           ],
 
-          // Create Account button
           _buildCreateBtn(),
         ],
       ),
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  INPUT FIELD — fixed height 54, no overflow, proper alignment
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Input field ───────────────────────────────────────────────────────────
   Widget _field({
     required TextEditingController ctrl,
+    required FocusNode focus,
     required String hint,
     required IconData icon,
     bool obscure = false,
     Widget? suffix,
     TextInputType? type,
+    String? error,
+    ValueChanged<String>? onChanged,
   }) {
-    return Container(
-      height: 54,
-      decoration: BoxDecoration(
-        color: _inputBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border, width: 1),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const SizedBox(width: 16),
-          Icon(icon, color: _textHint, size: 18),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: ctrl,
-              obscureText: obscure,
-              keyboardType: type,
-              style: GoogleFonts.dmSans(
-                color: _textMain, fontSize: 15, fontWeight: FontWeight.w400,
-              ),
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: GoogleFonts.dmSans(
-                  color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+    final focused  = focus.hasFocus;
+    final hasError = error != null;
+
+    Color borderColor;
+    if (hasError)     borderColor = _errorRed;
+    else if (focused) borderColor = _purple;
+    else              borderColor = _border;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 54,
+          decoration: BoxDecoration(
+            color: _inputBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: borderColor,
+              width: hasError || focused ? 1.6 : 1.2,
+            ),
+            boxShadow: focused ? [
+              BoxShadow(color: _purple.withOpacity(0.12), blurRadius: 8),
+            ] : [],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(width: 16),
+              Icon(icon,
+                color: hasError ? _errorRed : (focused ? _purple : _textHint),
+                size: 18),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: ctrl,
+                  focusNode: focus,
+                  obscureText: obscure,
+                  keyboardType: type,
+                  onChanged: onChanged,
+                  style: GoogleFonts.dmSans(
+                    color: _textMain, fontSize: 15, fontWeight: FontWeight.w400,
+                  ),
+                  cursorColor: _purple,
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    hintStyle: GoogleFonts.dmSans(
+                      color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
               ),
+              if (suffix != null) suffix,
+            ],
+          ),
+        ),
+        if (hasError) ...[
+          const SizedBox(height: 5),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: _errorRed, size: 13),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(error,
+                    style: GoogleFonts.dmSans(
+                      color: _errorRed, fontSize: 12, fontWeight: FontWeight.w500,
+                    )),
+                ),
+              ],
             ),
           ),
-          if (suffix != null) suffix,
+        ],
+      ],
+    );
+  }
+
+  // ── Error banner ──────────────────────────────────────────────────────────
+  Widget _errorBanner(String msg) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: _errorRed.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _errorRed.withOpacity(0.30)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: _errorRed, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(msg,
+              style: GoogleFonts.dmSans(
+                color: _errorRed, fontSize: 13, fontWeight: FontWeight.w500,
+              )),
+          ),
         ],
       ),
     );
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  CREATE ACCOUNT BUTTON
-  // ════════════════════════════════════════════════════════════════════════
+  // ── Create button ─────────────────────────────────────────────────────────
   Widget _buildCreateBtn() {
     return SizedBox(
       width: double.infinity,
@@ -280,16 +418,15 @@ class _SignupScreenState extends State<SignupScreen> {
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF7B6CF6), Color(0xFF6657E8)],
+            colors: [Color(0xFF7B6CF6), Color(0xFF5A4EE0)],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: _purple.withOpacity(0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              color: _purple.withOpacity(0.40),
+              blurRadius: 18, offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -297,22 +434,19 @@ class _SignupScreenState extends State<SignupScreen> {
           onPressed: _loading ? null : _createAccount,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
-            shadowColor:     Colors.transparent,
+            shadowColor: Colors.transparent,
+            disabledBackgroundColor: Colors.transparent,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           child: _loading
               ? const SizedBox(
                   width: 22, height: 22,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                 )
-              : Text(
-                  'Create Account',
+              : Text('Create Account',
                   style: GoogleFonts.dmSans(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                    color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700,
+                  )),
         ),
       ),
     );
