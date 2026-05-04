@@ -36,7 +36,7 @@ class _SignupScreenState extends State<SignupScreen> {
   // ── Palette ─────────────────────────────────────────────────────────────
   static const _bg        = Color(0xFF0D0E17);
   static const _cardBg    = Color(0xFF161824);
-  static const _inputBg   = Color(0xFF1C1D2A);
+  static const _inputBg   = Color(0xFF13141F);
   static const _border    = Color(0xFF2E3048);
   static const _purple    = Color(0xFF6C63FF);
   static const _headerTop = Color(0xFF7B72FF);
@@ -344,6 +344,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   obscureText: obscure,
                   keyboardType: type,
                   onChanged: onChanged,
+                  autocorrect: false,
+                  autofillHints: null,
                   style: GoogleFonts.dmSans(
                     color: _textMain, fontSize: 15, fontWeight: FontWeight.w400,
                   ),
@@ -356,6 +358,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.transparent,
                   ),
                 ),
               ),

@@ -63,6 +63,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   static const _textHint  = Color(0xFF545670);
   static const _errorRed  = Color(0xFFFF5C6A);
 
+  // ── Purple gradient matching Sign In button ───────────────────────────────
+  static const _purpleStart = Color(0xFF5B4FE8);
+  static const _purpleEnd   = Color(0xFF7B6FF0);
+
   @override
   void initState() {
     super.initState();
@@ -135,7 +139,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             Text(isEdit ? 'Post updated!' : 'Skill post published!',
               style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
           ]),
-          backgroundColor: const Color(0xFF6C63FF),
+          backgroundColor: const Color(0xFF5B4FE8),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -288,17 +292,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  // ── App bar ───────────────────────────────────────────────────────────────
+  // ── App bar — purple gradient, taller height matching home screen ─────────
   Widget _buildAppBar(bool isEdit, BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
-      color: _surface,
-      padding: EdgeInsets.only(top: topPad, left: 4, right: 16, bottom: 0),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_purpleStart, _purpleEnd],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+      ),
+      padding: EdgeInsets.only(top: topPad, left: 4, right: 16, bottom: 18),
       child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left_rounded, color: _textMain, size: 28),
             onPressed: () => Navigator.maybePop(context),
+            padding: const EdgeInsets.symmetric(vertical: 14),
           ),
           Expanded(
             child: Text(
@@ -307,29 +318,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 color: _textMain, fontSize: 17,
                 fontWeight: FontWeight.w700, letterSpacing: -0.3,
               ),
-            ),
-          ),
-          // Publish button in header (top-right)
-          GestureDetector(
-            onTap: _isLoading ? null : _submit,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF9B6CF6), Color(0xFFE96DD8)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: _isLoading
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text('Publish',
-                      style: GoogleFonts.dmSans(
-                        color: Colors.white, fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      )),
             ),
           ),
         ],
@@ -633,7 +621,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  // ── Publish button ────────────────────────────────────────────────────────
+  // ── Publish button — purple gradient matching Sign In ─────────────────────
   Widget _publishButton(bool isEdit) {
     return SizedBox(
       width: double.infinity,
@@ -641,14 +629,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF9B6CF6), Color(0xFFE96DD8)],
+            colors: [_purpleStart, _purpleEnd],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: _purple.withOpacity(0.40),
+              color: _purpleStart.withOpacity(0.40),
               blurRadius: 20, offset: const Offset(0, 6),
             ),
           ],

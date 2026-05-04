@@ -31,13 +31,16 @@ class _LoginScreenState extends State<LoginScreen> {
   // ── Palette ─────────────────────────────────────────────────────────────
   static const _bg       = Color(0xFF0D0E17);
   static const _cardBg   = Color(0xFF161824);
-  static const _inputBg  = Color(0xFF1C1D2A);
+  static const _inputBg  = Color(0xFF13141F);
   static const _border   = Color(0xFF2E3048);
   static const _purple   = Color(0xFF6C63FF);
   static const _textMain = Color(0xFFFFFFFF);
   static const _textSub  = Color(0xFF8E90A8);
   static const _textHint = Color(0xFF545670);
   static const _errorRed = Color(0xFFFF5C6A);
+
+  // Sign In button uses a different color (kept from image 2)
+  static const _btnColor = Color(0xFF5B52E8);
 
   @override
   void initState() {
@@ -320,6 +323,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: obscure,
                   keyboardType: type,
                   onChanged: onChanged,
+                  autocorrect: false,
+                  autofillHints: null,
                   style: GoogleFonts.dmSans(
                     color: _textMain, fontSize: 15, fontWeight: FontWeight.w500,
                   ),
@@ -334,6 +339,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     focusedBorder: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.transparent,
                   ),
                 ),
               ),
@@ -393,15 +400,12 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 56,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7B6CF6), Color(0xFF5A4EE0)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
+          // Kept from image 2 — solid color instead of gradient
+          color: _btnColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: _purple.withOpacity(0.40),
+              color: _btnColor.withOpacity(0.40),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
