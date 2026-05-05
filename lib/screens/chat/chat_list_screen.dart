@@ -1,9 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../../models/chat_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
@@ -21,18 +24,32 @@ class _ChatListScreenState extends State<ChatListScreen> {
   String _query = '';
   final Set<String> _pinned = {};
 
-  bool get _d   => Theme.of(context).brightness == Brightness.dark;
-  Color get _bg => _d ? const Color(0xFF111318) : Colors.white;
-  Color get _sf => _d ? const Color(0xFF1A1D24) : Colors.white;
-  Color get _sv => _d ? const Color(0xFF22252E) : const Color(0xFFF4F4F6);
-  Color get _bd => _d ? const Color(0xFF2A2D36) : const Color(0xFFEFEFEF);
-  Color get _tp => _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
-  Color get _ts => _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
-  Color get _tl => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
+  // ── Palette ──────────────────────────────────────────────────────────────
+  static const _bg        = Color(0xFF0D0E17);
+  static const _card      = Color(0xFF161824);
+  static const _inputBg   = Color(0xFF1C1E2C);
+  static const _border    = Color(0xFF252740);
+  static const _purple    = Color(0xFF6C63FF);
+  static const _textMain  = Color(0xFFFFFFFF);
+  static const _textSub   = Color(0xFF8E90A8);
+  static const _textHint  = Color(0xFF545670);
+  static const _online    = Color(0xFF22C55E);
 
-  // Gradient colours matching the screenshot header
-  static const _purpleStart = Color(0xFF5B4FE8);
-  static const _purpleEnd   = Color(0xFF7B6FF0);
+  Color _avatarColor(String name) {
+    final colors = [
+      const Color(0xFF6C63FF), const Color(0xFF3B82F6), const Color(0xFF10B981),
+      const Color(0xFFF59E0B), const Color(0xFFEF4444), const Color(0xFF8B5CF6),
+      const Color(0xFFEC4899), const Color(0xFF14B8A6),
+    ];
+    return colors[name.hashCode.abs() % colors.length];
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
 
   @override
   void initState() {
@@ -48,35 +65,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.dispose();
   }
 
-  Color _statusColor(String s) => switch (s) {
-        'pending'   => AppColors.warning,
-        'completed' => AppColors.success,
-        'cancelled' => AppColors.error,
-        _           => _tl,
-      };
-
-  String _statusLabel(String s) => switch (s) {
-        'pending'   => 'Pending',
-        'completed' => 'Done',
-        'cancelled' => 'Cancelled',
-        _           => '',
-      };
-
-  Future<void> _showPinPopup(String chatId, String name) async {
+  Future<void> _showPinPopup(ChatModel chat) async {
     HapticFeedback.lightImpact();
-    final isPinned = _pinned.contains(chatId);
+    final isPinned = _pinned.contains(chat.id);
+    final name = chat.otherUser?.fullName ?? chat.otherUser?.username ?? 'User';
     final result = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _PinBottomSheet(
+      builder: (_) => _ActionSheet(
         name: name, isPinned: isPinned,
-        d: _d, sf: _sf, bd: _bd, tp: _tp, ts: _ts,
+        onPin: () => Navigator.pop(context, 'pin'),
+        onMute: () => Navigator.pop(context),
+        onDelete: () => Navigator.pop(context, 'delete'),
       ),
     );
-    if (result == 'toggle') {
+    if (result == 'pin') {
       setState(() {
-        if (isPinned) _pinned.remove(chatId);
-        else          _pinned.add(chatId);
+        if (isPinned) _pinned.remove(chat.id);
+        else _pinned.add(chat.id);
       });
     }
   }
@@ -85,278 +91,261 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-
-          // ── Gradient header — no edit button ─────────────────
-          SliverAppBar(
-            pinned: true,
-            automaticallyImplyLeading: false,
-            toolbarHeight: 72,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [_purpleStart, _purpleEnd],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
+      body: Column(
+        children: [
+          // ── Header with centered purple box ──────────────────────────────
+          Container(
+            color: _bg,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _purple,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Messages',
+                      style: GoogleFonts.dmSans(
+                        color: _textMain,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            surfaceTintColor: Colors.transparent,
-            title: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('Messages',
-                  style: GoogleFonts.dmSans(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  )),
-            ),
-            centerTitle: false,
           ),
 
           // ── Search bar ───────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 44,
-                decoration: BoxDecoration(
-                  color: _sv,
-                  borderRadius: BorderRadius.circular(14),
-                  border: _query.isNotEmpty
-                      ? Border.all(color: AppColors.primary, width: 1.5)
-                      : null,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: _inputBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _query.isNotEmpty ? _purple : _border,
+                  width: _query.isNotEmpty ? 1.5 : 1,
                 ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 12),
-                    Icon(Icons.search_rounded, color: _ts, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Theme(
-                        data: Theme.of(context).copyWith(
-                          splashColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  const Icon(Icons.search_rounded, color: _textHint, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        textSelectionTheme: TextSelectionThemeData(
+                          selectionColor: _purple.withOpacity(0.28),
+                          cursorColor: _purple,
+                          selectionHandleColor: _purple,
                         ),
-                        child: TextField(
-                          controller: _searchCtrl,
-                          onChanged: (v) => setState(() => _query = v),
-                          autofillHints: const [],
-                          style: GoogleFonts.dmSans(color: _tp, fontSize: 14),
-                          cursorColor: AppColors.primary,
-                          decoration: InputDecoration(
-                            hintText: 'Search conversations...',
-                            hintStyle: GoogleFonts.dmSans(color: _ts, fontSize: 14),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                            filled: true,
-                            fillColor: Colors.transparent,
-                          ),
+                      ),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (v) => setState(() => _query = v),
+                        autofillHints: const [],
+                        enableIMEPersonalizedLearning: false,
+                        style: GoogleFonts.dmSans(color: _textMain, fontSize: 14),
+                        cursorColor: _purple,
+                        decoration: InputDecoration(
+                          hintText: 'Search conversations...',
+                          hintStyle: GoogleFonts.dmSans(color: _textHint, fontSize: 14),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          filled: true,
+                          fillColor: Colors.transparent,
                         ),
                       ),
                     ),
-                    if (_query.isNotEmpty)
-                      GestureDetector(
-                        onTap: () { _searchCtrl.clear(); setState(() => _query = ''); },
-                        child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Icon(Icons.close_rounded, color: _ts, size: 16),
-                        ),
-                      )
-                    else
-                      const SizedBox(width: 12),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 40.ms),
+                  ),
+                  if (_query.isNotEmpty)
+                    GestureDetector(
+                      onTap: () { _searchCtrl.clear(); setState(() => _query = ''); },
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(Icons.close_rounded, color: _textHint, size: 16),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 12),
+                ],
+              ),
             ),
           ),
 
           // ── "Recent" label ───────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
               child: Text('Recent',
-                  style: GoogleFonts.dmSans(
-                    color: _ts, fontSize: 11.5,
-                    fontWeight: FontWeight.w700, letterSpacing: 0.7,
-                  )),
+                style: GoogleFonts.dmSans(
+                  color: _textHint, fontSize: 11.5,
+                  fontWeight: FontWeight.w700, letterSpacing: 0.7,
+                )),
             ),
           ),
 
           // ── Chat list ────────────────────────────────────────
-          Consumer<ChatService>(
-            builder: (_, cs, __) {
-              if (cs.isLoading && cs.chats.isEmpty) {
-                return SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.primary, strokeWidth: 2),
-                  ),
-                );
-              }
+          Expanded(
+            child: Consumer<ChatService>(
+              builder: (_, cs, __) {
+                if (cs.isLoading && cs.chats.isEmpty) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: _purple, strokeWidth: 2),
+                  );
+                }
 
-              if (cs.chats.isEmpty) return SliverFillRemaining(child: _empty());
+                if (cs.chats.isEmpty) return _empty();
 
-              if (_pinned.isEmpty && cs.chats.isNotEmpty) {
-                _pinned.add(cs.chats.first.id);
-              }
+                var list = _query.isEmpty
+                    ? cs.chats
+                    : cs.chats.where((c) {
+                        final n = (c.otherUser?.fullName ?? '').toLowerCase();
+                        final u = (c.otherUser?.username ?? '').toLowerCase();
+                        final q = _query.toLowerCase();
+                        return n.contains(q) || u.contains(q);
+                      }).toList();
 
-              var list = _query.isEmpty
-                  ? cs.chats
-                  : cs.chats.where((c) {
-                      final n = (c.otherUser?.fullName ?? '').toLowerCase();
-                      final u = (c.otherUser?.username ?? '').toLowerCase();
-                      final q = _query.toLowerCase();
-                      return n.contains(q) || u.contains(q);
-                    }).toList();
+                list = [
+                  ...list.where((c) => _pinned.contains(c.id)),
+                  ...list.where((c) => !_pinned.contains(c.id)),
+                ];
 
-              list = [
-                ...list.where((c) => _pinned.contains(c.id)),
-                ...list.where((c) => !_pinned.contains(c.id)),
-              ];
-
-              if (list.isEmpty) {
-                return SliverFillRemaining(
-                  child: Center(
+                if (list.isEmpty) {
+                  return Center(
                     child: Text('No conversations found',
-                        style: GoogleFonts.dmSans(color: _ts, fontSize: 14)),
+                      style: GoogleFonts.dmSans(color: _textHint, fontSize: 14)),
+                  );
+                }
+
+                return RefreshIndicator(
+                  color: _purple,
+                  backgroundColor: _card,
+                  onRefresh: () => cs.fetchChats(),
+                  child: ListView.builder(
+                    physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics()),
+                    padding: const EdgeInsets.only(bottom: 100),
+                    itemCount: list.length,
+                    itemBuilder: (ctx, i) {
+                      final chat = list[i];
+                      final other = chat.otherUser;
+                      final name = other?.fullName ?? other?.username ?? 'Unknown';
+                      final isPinned = _pinned.contains(chat.id);
+
+                      return _ChatTile(
+                        key: ValueKey(chat.id),
+                        name: name,
+                        username: other?.username ?? '',
+                        lastMessage: chat.lastMessage ?? 'Start the conversation...',
+                        time: timeago.format(chat.lastMessageAt),
+                        avatarUrl: other?.avatarUrl,
+                        avatarColor: _avatarColor(name),
+                        initials: _initials(name),
+                        isPinned: isPinned,
+                        unreadCount: chat.unreadCount,
+                        index: i,
+                        onTap: () => Navigator.push(
+                          ctx,
+                          PageRouteBuilder(
+                            pageBuilder: (_, a1, __) => ChatScreen(chat: chat),
+                            transitionsBuilder: (_, a1, __, child) => SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(1, 0), end: Offset.zero)
+                                  .animate(CurvedAnimation(
+                                    parent: a1, curve: Curves.easeOutCubic)),
+                              child: child,
+                            ),
+                          ),
+                        ).then((_) => cs.fetchChats()),
+                        onLongPress: () => _showPinPopup(chat),
+                      );
+                    },
                   ),
                 );
-              }
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) {
-                    final chat = list[i];
-                    final other = chat.otherUser;
-                    final isPinned = _pinned.contains(chat.id);
-                    final hasStatus = chat.swapStatus != 'none' &&
-                        chat.swapStatus.isNotEmpty;
-
-                    return _ChatTile(
-                      key: ValueKey(chat.id),
-                      avatarUrl: other?.avatarUrl,
-                      username: other?.username ?? '',
-                      displayName: other?.fullName ?? other?.username ?? 'Unknown',
-                      lastMessage: chat.lastMessage ?? 'Start the conversation...',
-                      hasMessage: chat.lastMessage != null,
-                      time: timeago.format(chat.lastMessageAt),
-                      statusColor: hasStatus ? _statusColor(chat.swapStatus) : null,
-                      statusLabel: hasStatus ? _statusLabel(chat.swapStatus) : null,
-                      isPinned: isPinned,
-                      isRead: chat.unreadCount == 0,
-                      unreadCount: chat.unreadCount,
-                      index: i,
-                      d: _d, sf: _sf, bd: _bd, tp: _tp, ts: _ts, tl: _tl, sv: _sv,
-                      onTap: () => Navigator.push(
-                        ctx,
-                        PageRouteBuilder(
-                          pageBuilder: (_, a1, __) => ChatScreen(chat: chat),
-                          transitionsBuilder: (_, a1, __, child) => SlideTransition(
-                            position: Tween<Offset>(
-                                    begin: const Offset(1, 0), end: Offset.zero)
-                                .animate(CurvedAnimation(
-                                    parent: a1, curve: Curves.easeOutCubic)),
-                            child: child,
-                          ),
-                        ),
-                      ).then((_) => cs.fetchChats()),
-                      onLongPress: () => _showPinPopup(
-                          chat.id, other?.fullName ?? other?.username ?? ''),
-                      onAvatarTap: other?.id != null
-                          ? () => Navigator.push(ctx,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          UserProfileScreen(userId: other!.id)))
-                          : null,
-                    );
-                  },
-                  childCount: list.length,
-                ),
-              );
-            },
+              },
+            ),
           ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 90)),
         ],
       ),
     );
   }
 
   Widget _empty() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.chat_bubble_outline_rounded,
-                  size: 44, color: AppColors.primary),
-            ),
-            const SizedBox(height: 18),
-            Text('No conversations yet',
-                style: GoogleFonts.dmSans(
-                    color: _tp, fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text('Find a skill post and start chatting!',
-                style: GoogleFonts.dmSans(color: _ts, fontSize: 13)),
-          ],
-        ).animate().fadeIn().scale(begin: const Offset(0.92, 0.92)),
-      );
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 80, height: 80,
+          decoration: BoxDecoration(
+            color: _purple.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.chat_bubble_outline_rounded,
+            size: 40, color: _purple),
+        ),
+        const SizedBox(height: 18),
+        Text('No conversations yet',
+          style: GoogleFonts.dmSans(
+            color: _textMain, fontSize: 17, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        Text('Find a skill post and start chatting!',
+          style: GoogleFonts.dmSans(color: _textHint, fontSize: 13)),
+      ],
+    ).animate().fadeIn().scale(begin: const Offset(0.92, 0.92)),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Chat Tile
 // ─────────────────────────────────────────────────────────────────────────────
 class _ChatTile extends StatelessWidget {
+  final String name, username, lastMessage, time, initials;
   final String? avatarUrl;
-  final String username, displayName, lastMessage, time;
-  final bool hasMessage, isPinned, isRead;
+  final Color avatarColor;
+  final bool isPinned;
   final int unreadCount, index;
-  final bool d;
-  final Color sf, bd, tp, ts, tl, sv;
-  final Color? statusColor;
-  final String? statusLabel;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final VoidCallback? onAvatarTap;
+  final VoidCallback onTap, onLongPress;
+
+  static const _bg       = Color(0xFF0D0E17);
+  static const _card     = Color(0xFF161824);
+  static const _border   = Color(0xFF252740);
+  static const _purple   = Color(0xFF6C63FF);
+  static const _textMain = Color(0xFFFFFFFF);
+  static const _textSub  = Color(0xFF8E90A8);
+  static const _textHint = Color(0xFF545670);
+  static const _online   = Color(0xFF22C55E);
 
   const _ChatTile({
     super.key,
-    required this.avatarUrl,
+    required this.name,
     required this.username,
-    required this.displayName,
     required this.lastMessage,
-    required this.hasMessage,
     required this.time,
+    required this.initials,
+    required this.avatarColor,
     required this.isPinned,
-    required this.isRead,
     required this.unreadCount,
     required this.index,
-    required this.d,
-    required this.sf,
-    required this.bd,
-    required this.tp,
-    required this.ts,
-    required this.tl,
-    required this.sv,
     required this.onTap,
-    this.statusColor,
-    this.statusLabel,
-    this.onLongPress,
-    this.onAvatarTap,
+    required this.onLongPress,
+    this.avatarUrl,
   });
 
   @override
@@ -364,24 +353,62 @@ class _ChatTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isPinned
-              ? (d
-                  ? AppColors.primary.withOpacity(0.06)
-                  : AppColors.primary.withOpacity(0.03))
-              : sf,
-          border: Border(bottom: BorderSide(color: bd, width: 1)),
+          color: isPinned ? _purple.withOpacity(0.08) : _card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isPinned ? _purple.withOpacity(0.3) : _border,
+            width: 1,
+          ),
         ),
         child: Row(
           children: [
-            GestureDetector(
-              onTap: onAvatarTap,
-              child: AvatarWidget(avatarUrl: avatarUrl, username: username, radius: 26),
+            // Avatar with online dot
+            Stack(
+              children: [
+                Container(
+                  width: 52, height: 52,
+                  decoration: BoxDecoration(
+                    color: avatarColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: avatarUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(avatarUrl!, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(initials,
+                                style: GoogleFonts.dmSans(
+                                  color: Colors.white, fontSize: 18,
+                                  fontWeight: FontWeight.w700))),
+                          ),
+                        )
+                      : Center(
+                          child: Text(initials,
+                            style: GoogleFonts.dmSans(
+                              color: Colors.white, fontSize: 18,
+                              fontWeight: FontWeight.w700)),
+                        ),
+                ),
+                // Online dot
+                Positioned(
+                  bottom: 1, right: 1,
+                  child: Container(
+                    width: 13, height: 13,
+                    decoration: BoxDecoration(
+                      color: _online,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _card, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: 12),
+
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,75 +416,56 @@ class _ChatTile extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(displayName,
-                            style: GoogleFonts.dmSans(
-                              fontWeight: unreadCount > 0
-                                  ? FontWeight.w800 : FontWeight.w600,
-                              fontSize: 14.5,
-                              color: tp,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                        child: Text(name,
+                          style: GoogleFonts.dmSans(
+                            color: _textMain, fontSize: 15,
+                            fontWeight: unreadCount > 0
+                              ? FontWeight.w800 : FontWeight.w700,
+                          ),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       Text(time,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 11,
-                            color: unreadCount > 0 ? AppColors.primary : tl,
-                            fontWeight: unreadCount > 0
-                                ? FontWeight.w600 : FontWeight.w400,
-                          )),
+                        style: GoogleFonts.dmSans(
+                          color: unreadCount > 0 ? _purple : _textHint,
+                          fontSize: 11.5,
+                          fontWeight: unreadCount > 0
+                            ? FontWeight.w700 : FontWeight.w400,
+                        )),
                     ],
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
-                        isRead ? Icons.done_all_rounded : Icons.done_rounded,
-                        size: 13,
-                        color: isRead ? AppColors.primary : tl,
-                      ),
+                      // Read receipt tick
+                      Icon(Icons.done_all_rounded, size: 13, color: _purple),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(lastMessage,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 13,
-                              color: unreadCount > 0 ? tp : ts,
-                              fontWeight: unreadCount > 0
-                                  ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                          style: GoogleFonts.dmSans(
+                            color: unreadCount > 0 ? _textMain : _textSub,
+                            fontSize: 13,
+                            fontWeight: unreadCount > 0
+                              ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       if (unreadCount > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            unreadCount > 9 ? '9+' : unreadCount.toString(),
-                            style: GoogleFonts.dmSans(
-                              color: Colors.white, fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                          width: 22, height: 22,
+                          decoration: const BoxDecoration(
+                            color: _purple, shape: BoxShape.circle),
+                          child: Center(
+                            child: Text(
+                              unreadCount > 9 ? '9+' : '$unreadCount',
+                              style: GoogleFonts.dmSans(
+                                color: Colors.white, fontSize: 10,
+                                fontWeight: FontWeight.w800),
                             ),
                           ),
-                        )
-                      else if (statusLabel != null && statusLabel!.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: statusColor!.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(statusLabel!,
-                              style: GoogleFonts.dmSans(
-                                fontSize: 10, color: statusColor,
-                                fontWeight: FontWeight.w700,
-                              )),
                         ),
+                      if (isPinned && unreadCount == 0)
+                        const Icon(Icons.push_pin_rounded,
+                          color: _purple, size: 14),
                     ],
                   ),
                 ],
@@ -466,101 +474,76 @@ class _ChatTile extends StatelessWidget {
           ],
         ),
       ),
-    )
-        .animate()
-        .fadeIn(delay: Duration(milliseconds: index * 35))
-        .slideX(begin: 0.03, curve: Curves.easeOutCubic);
+    ).animate()
+      .fadeIn(delay: Duration(milliseconds: index * 40))
+      .slideX(begin: 0.04, curve: Curves.easeOutCubic);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Pin bottom sheet
+//  Long-press action sheet
 // ─────────────────────────────────────────────────────────────────────────────
-class _PinBottomSheet extends StatelessWidget {
+class _ActionSheet extends StatelessWidget {
   final String name;
-  final bool isPinned, d;
-  final Color sf, bd, tp, ts;
+  final bool isPinned;
+  final VoidCallback onPin, onMute, onDelete;
 
-  const _PinBottomSheet({
+  static const _card   = Color(0xFF161824);
+  static const _border = Color(0xFF252740);
+  static const _purple = Color(0xFF6C63FF);
+  static const _textMain = Color(0xFFFFFFFF);
+  static const _textSub  = Color(0xFF8E90A8);
+
+  const _ActionSheet({
     required this.name, required this.isPinned,
-    required this.d, required this.sf, required this.bd,
-    required this.tp, required this.ts,
+    required this.onPin, required this.onMute, required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
       decoration: BoxDecoration(
-        color: sf,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: _card,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _border),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 36, height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 16),
             decoration: BoxDecoration(
-              color: d ? const Color(0xFF3A3D48) : const Color(0xFFDDDDDD),
-              borderRadius: BorderRadius.circular(2),
-            ),
+              color: _border, borderRadius: BorderRadius.circular(2)),
           ),
-          const SizedBox(height: 18),
-          Text(name,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(name,
               style: GoogleFonts.dmSans(
-                  color: tp, fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(isPinned ? 'This conversation is pinned' : 'Pin this conversation?',
-              style: GoogleFonts.dmSans(color: ts, fontSize: 13)),
-          const SizedBox(height: 20),
-          Divider(color: bd, height: 1),
-          const SizedBox(height: 6),
-          _SheetAction(
-            icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-            iconColor: AppColors.primary,
-            label: isPinned ? 'Unpin conversation' : 'Pin conversation',
-            labelColor: tp,
-            onTap: () => Navigator.pop(context, 'toggle'),
+                color: _textMain, fontSize: 16, fontWeight: FontWeight.w700)),
           ),
-          _SheetAction(
-            icon: Icons.notifications_off_outlined,
-            iconColor: ts,
-            label: 'Mute notifications',
-            labelColor: tp,
-            onTap: () => Navigator.pop(context),
-          ),
-          _SheetAction(
-            icon: Icons.delete_outline_rounded,
-            iconColor: AppColors.error,
-            label: 'Delete conversation',
-            labelColor: AppColors.error,
-            onTap: () => Navigator.pop(context),
-          ),
+          const SizedBox(height: 16),
+          _tile(Icons.push_pin_rounded, _purple,
+            isPinned ? 'Unpin conversation' : 'Pin conversation', _textMain, onPin),
+          _tile(Icons.notifications_off_outlined, _textSub,
+            'Mute notifications', _textMain, onMute),
+          _tile(Icons.delete_outline_rounded, const Color(0xFFEF4444),
+            'Delete conversation', const Color(0xFFEF4444), onDelete),
+          const SizedBox(height: 8),
         ],
       ),
     ).animate().slideY(begin: 0.3, curve: Curves.easeOutCubic, duration: 280.ms);
   }
-}
 
-class _SheetAction extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor, labelColor;
-  final String label;
-  final VoidCallback onTap;
-
-  const _SheetAction({
-    required this.icon, required this.iconColor,
-    required this.label, required this.labelColor, required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _tile(IconData icon, Color iconColor, String label,
+      Color labelColor, VoidCallback onTap) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
       leading: Icon(icon, color: iconColor, size: 22),
       title: Text(label,
-          style: GoogleFonts.dmSans(
-              color: labelColor, fontSize: 14.5, fontWeight: FontWeight.w600)),
+        style: GoogleFonts.dmSans(
+          color: labelColor, fontSize: 15, fontWeight: FontWeight.w600)),
       onTap: onTap,
     );
   }
