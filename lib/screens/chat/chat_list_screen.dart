@@ -93,34 +93,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
       backgroundColor: _bg,
       body: Column(
         children: [
-          // ── Header with centered purple box ──────────────────────────────
+          // ── Header: full-width purple gradient ───────────────────────────
           Container(
-            color: _bg,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Color(0xFF5B4FF0), // deep purple-violet left
+                  Color(0xFF8A82F8), // lighter lavender right
+                ],
+              ),
+            ),
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _purple,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Messages',
-                      style: GoogleFonts.dmSans(
-                        color: _textMain,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Text(
+                  'Messages',
+                  style: GoogleFonts.dmSans(
+                    color: _textMain,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),
             ),
           ),
+          // thin dark divider below header
+          Container(height: 3, color: const Color(0xFF0D0E17)),
 
           // ── Search bar ───────────────────────────────────────
           Padding(
