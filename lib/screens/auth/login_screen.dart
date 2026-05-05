@@ -120,6 +120,326 @@ class _LoginScreenState extends State<LoginScreen> {
     return 'Sign in failed. Please try again.';
   }
 
+  // ── Forgot password bottom sheet ─────────────────────────────────────────
+  void _showForgotPasswordSheet() {
+    final resetEmailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    String? sheetError;
+    bool sheetLoading = false;
+    bool sheetSent = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> sendReset() async {
+              final email = resetEmailCtrl.text.trim();
+              if (email.isEmpty || !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+                setSheetState(() => sheetError = 'Please enter a valid email address.');
+                return;
+              }
+              setSheetState(() { sheetLoading = true; sheetError = null; });
+              try {
+                final ok = await context.read<AuthService>().resetPassword(email);
+                if (ok) {
+                  setSheetState(() { sheetSent = true; sheetLoading = false; });
+                } else {
+                  setSheetState(() {
+                    sheetError = 'Could not send reset email. Please try again.';
+                    sheetLoading = false;
+                  });
+                }
+              } catch (e) {
+                setSheetState(() {
+                  sheetError = 'Something went wrong. Please try again.';
+                  sheetLoading = false;
+                });
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+                decoration: BoxDecoration(
+                  color: _cardBg,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: _border, width: 1),
+                ),
+                child: sheetSent
+                    ? _resetSuccessView(ctx, resetEmailCtrl.text.trim())
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Handle bar
+                          Center(
+                            child: Container(
+                              width: 40, height: 4,
+                              margin: const EdgeInsets.only(bottom: 20),
+                              decoration: BoxDecoration(
+                                color: _border,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+
+                          // Icon
+                          Container(
+                            width: 52, height: 52,
+                            decoration: BoxDecoration(
+                              color: _purple.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(Icons.lock_reset_rounded,
+                              color: _purple, size: 26),
+                          ),
+                          const SizedBox(height: 16),
+
+                          Text('Reset password',
+                            style: GoogleFonts.dmSans(
+                              color: _textMain, fontSize: 20,
+                              fontWeight: FontWeight.w800, letterSpacing: -0.3,
+                            )),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Enter the email linked to your account and we\'ll send you a reset link.',
+                            style: GoogleFonts.dmSans(color: _textSub, fontSize: 14, height: 1.5),
+                          ),
+                          const SizedBox(height: 22),
+
+                          // Email input
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: _inputBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: sheetError != null ? _errorRed : _border,
+                                width: sheetError != null ? 1.6 : 1.2,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const SizedBox(width: 16),
+                                Icon(Icons.mail_outline_rounded,
+                                  color: sheetError != null ? _errorRed : _textHint,
+                                  size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Theme(
+                                    data: Theme.of(ctx).copyWith(
+                                      splashColor: Colors.transparent,
+                                      highlightColor: Colors.transparent,
+                                      hoverColor: Colors.transparent,
+                                      textSelectionTheme: TextSelectionThemeData(
+                                        selectionColor: _purple.withOpacity(0.30),
+                                        cursorColor: _purple,
+                                        selectionHandleColor: _purple,
+                                      ),
+                                    ),
+                                    child: TextField(
+                                      controller: resetEmailCtrl,
+                                      keyboardType: TextInputType.emailAddress,
+                                      autocorrect: false,
+                                      autofillHints: const [],
+                                      enableIMEPersonalizedLearning: false,
+                                      onChanged: (_) {
+                                        if (sheetError != null) setSheetState(() => sheetError = null);
+                                      },
+                                      style: GoogleFonts.dmSans(
+                                        color: _textMain, fontSize: 15, fontWeight: FontWeight.w500,
+                                      ),
+                                      cursorColor: _purple,
+                                      decoration: InputDecoration(
+                                        hintText: 'Email address',
+                                        hintStyle: GoogleFonts.dmSans(
+                                          color: _textHint, fontSize: 15,
+                                        ),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        filled: true,
+                                        fillColor: Colors.transparent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                              ],
+                            ),
+                          ),
+
+                          // Inline error
+                          if (sheetError != null) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.error_outline_rounded, color: _errorRed, size: 13),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(sheetError!,
+                                    style: GoogleFonts.dmSans(
+                                      color: _errorRed, fontSize: 12, fontWeight: FontWeight.w500,
+                                    )),
+                                ),
+                              ],
+                            ),
+                          ],
+
+                          const SizedBox(height: 22),
+
+                          // Send button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 54,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: _purple,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _purple.withOpacity(0.35),
+                                    blurRadius: 16, offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: sheetLoading ? null : sendReset,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  disabledBackgroundColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: sheetLoading
+                                    ? const SizedBox(
+                                        width: 22, height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white, strokeWidth: 2.5),
+                                      )
+                                    : Text('Send reset link',
+                                        style: GoogleFonts.dmSans(
+                                          color: Colors.white,
+                                          fontSize: 16, fontWeight: FontWeight.w700,
+                                        )),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Cancel
+                          Center(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              style: TextButton.styleFrom(
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text('Cancel',
+                                style: GoogleFonts.dmSans(
+                                  color: _textSub, fontSize: 14, fontWeight: FontWeight.w600,
+                                )),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _resetSuccessView(BuildContext ctx, String email) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Handle bar
+        Container(
+          width: 40, height: 4,
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            color: _border,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+
+        // Success icon
+        Container(
+          width: 72, height: 72,
+          decoration: BoxDecoration(
+            color: const Color(0xFF22C55E).withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.mark_email_read_rounded,
+            color: Color(0xFF22C55E), size: 36),
+        ),
+        const SizedBox(height: 20),
+
+        Text('Check your inbox',
+          style: GoogleFonts.dmSans(
+            color: _textMain, fontSize: 20,
+            fontWeight: FontWeight.w800, letterSpacing: -0.3,
+          )),
+        const SizedBox(height: 10),
+        Text(
+          'We\'ve sent a password reset link to\n$email',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.dmSans(color: _textSub, fontSize: 14, height: 1.6),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Didn\'t receive it? Check your spam folder.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.dmSans(color: _textHint, fontSize: 12),
+        ),
+        const SizedBox(height: 28),
+
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: _purple,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: _purple.withOpacity(0.35),
+                  blurRadius: 16, offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              ),
+              child: Text('Back to Sign In',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontSize: 16, fontWeight: FontWeight.w700,
+                )),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+
   // ── UI ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -241,7 +561,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: _showForgotPasswordSheet,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.only(top: 4, bottom: 2),
                 minimumSize: Size.zero,
@@ -317,30 +637,43 @@ class _LoginScreenState extends State<LoginScreen> {
                 size: 20),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
-                  controller: ctrl,
-                  focusNode: focus,
-                  obscureText: obscure,
-                  keyboardType: type,
-                  onChanged: onChanged,
-                  autocorrect: false,
-                  autofillHints: null,
-                  style: GoogleFonts.dmSans(
-                    color: _textMain, fontSize: 15, fontWeight: FontWeight.w500,
-                  ),
-                  cursorColor: _purple,
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    hintStyle: GoogleFonts.dmSans(
-                      color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                    textSelectionTheme: TextSelectionThemeData(
+                      selectionColor: _purple.withOpacity(0.30),
+                      cursorColor: _purple,
+                      selectionHandleColor: _purple,
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: Colors.transparent,
+                  ),
+                  child: TextField(
+                    controller: ctrl,
+                    focusNode: focus,
+                    obscureText: obscure,
+                    keyboardType: type,
+                    onChanged: onChanged,
+                    autocorrect: false,
+                    autofillHints: const [],
+                    enableIMEPersonalizedLearning: false,
+                    style: GoogleFonts.dmSans(
+                      color: _textMain, fontSize: 15, fontWeight: FontWeight.w500,
+                    ),
+                    cursorColor: _purple,
+                    decoration: InputDecoration(
+                      hintText: hint,
+                      hintStyle: GoogleFonts.dmSans(
+                        color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                    ),
                   ),
                 ),
               ),

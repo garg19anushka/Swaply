@@ -163,14 +163,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               height: 54,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [_purple, _pink],
+                  colors: [Color(0xFF5B52E8), Color(0xFF5B52E8)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: _purple.withOpacity(0.35),
+                    color: const Color(0xFF5B52E8).withOpacity(0.35),
                     blurRadius: 16, offset: const Offset(0, 6),
                   ),
                 ],
@@ -324,9 +324,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: _bg3,          // --bg3 = #1A1B28
+          color: _bg3,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _bd, width: 1), // --bd = #272838
+          border: Border.all(color: _bd, width: 1),
         ),
         child: Stack(
           children: [
@@ -336,7 +336,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: Text(
                 label,
                 style: GoogleFonts.dmSans(
-                  color: _purple,    // label in purple like screenshot
+                  color: _purple,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -358,19 +358,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 22, bottom: 2, right: 14),
-                    child: TextField(
-                      controller: ctrl,
-                      maxLines: maxLines,
-                      style: GoogleFonts.dmSans(color: _tp, fontSize: 15, fontWeight: FontWeight.w500),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        isCollapsed: true,
-                        contentPadding: EdgeInsets.only(
-                          bottom: maxLines > 1 ? 14 : 12,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        textSelectionTheme: TextSelectionThemeData(
+                          selectionColor: _purple.withOpacity(0.28),
+                          cursorColor: _purple,
+                          selectionHandleColor: _purple,
                         ),
-                        hintStyle: GoogleFonts.dmSans(color: _tl, fontSize: 15),
                       ),
-                      cursorColor: _purple,
+                      child: TextField(
+                        controller: ctrl,
+                        maxLines: maxLines,
+                        autocorrect: false,
+                        autofillHints: const [],
+                        enableIMEPersonalizedLearning: false,
+                        style: GoogleFonts.dmSans(color: _tp, fontSize: 15, fontWeight: FontWeight.w500),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isCollapsed: true,
+                          contentPadding: EdgeInsets.only(
+                            bottom: maxLines > 1 ? 14 : 12,
+                          ),
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          hintStyle: GoogleFonts.dmSans(color: _tl, fontSize: 15),
+                        ),
+                        cursorColor: _purple,
+                      ),
                     ),
                   ),
                 ),

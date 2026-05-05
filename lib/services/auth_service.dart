@@ -90,8 +90,10 @@ class AuthService extends ChangeNotifier {
         email: email.trim(),
         password: password.trim(),
       );
-      await fetchProfile();
       _setLoading(false);
+      // Navigate immediately — fetch profile in the background so the
+      // user lands on the home screen without waiting for a DB round trip.
+      fetchProfile();
       return true;
     } on AuthException catch (e) {
       _setError(e.message);
@@ -139,10 +141,10 @@ class AuthService extends ChangeNotifier {
           .single();
       _currentProfile = ProfileModel.fromJson(data);
 
-      // Auto-patch empty fields from auth metadata
+      // Auto-patch stale fields from auth metadata — fire-and-forget so we
+      // never block navigation on a second round trip.
       final meta = user.userMetadata;
       if (meta != null) {
-        bool needsUpdate = false;
         final updates = <String, dynamic>{};
         final currentUsername = _currentProfile!.username;
         final currentFullName = _currentProfile!.fullName ?? '';
@@ -151,21 +153,37 @@ class AuthService extends ChangeNotifier {
                 currentUsername == user.id.substring(0, 8)) &&
             meta['username'] != null) {
           updates['username'] = meta['username'];
-          needsUpdate = true;
         }
         if (currentFullName.isEmpty && meta['full_name'] != null) {
           updates['full_name'] = meta['full_name'];
-          needsUpdate = true;
         }
-        if (needsUpdate) {
+        if (updates.isNotEmpty) {
           updates['updated_at'] = DateTime.now().toIso8601String();
-          await supabase.from('profiles').update(updates).eq('id', user.id);
-          final updated = await supabase
-              .from('profiles')
-              .select()
-              .eq('id', user.id)
-              .single();
-          _currentProfile = ProfileModel.fromJson(updated);
+          // Apply locally right away so the UI is correct immediately.
+          _currentProfile = _currentProfile!.copyWith(
+            fullName: updates['full_name'] ?? _currentProfile!.fullName,
+          );
+          if (updates.containsKey('username')) {
+            // username is not in copyWith, rebuild manually
+            _currentProfile = ProfileModel(
+              id: _currentProfile!.id,
+              username: updates['username'],
+              fullName: _currentProfile!.fullName,
+              bio: _currentProfile!.bio,
+              campus: _currentProfile!.campus,
+              skillsOffered: _currentProfile!.skillsOffered,
+              skillsWanted: _currentProfile!.skillsWanted,
+              avatarUrl: _currentProfile!.avatarUrl,
+              totalSwaps: _currentProfile!.totalSwaps,
+              averageRating: _currentProfile!.averageRating,
+              ratingCount: _currentProfile!.ratingCount,
+              createdAt: _currentProfile!.createdAt,
+            );
+          }
+          // Persist in background — no await, no extra round trip.
+          supabase.from('profiles').update(updates).eq('id', user.id)
+              .then((_) => debugPrint('Profile patched'))
+              .catchError((e) => debugPrint('Profile patch error: $e'));
         }
       }
       notifyListeners();

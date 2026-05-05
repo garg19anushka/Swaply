@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// Manages the app-wide theme mode (light / dark).
-/// Persists the choice across hot-restarts via a simple in-memory flag.
-/// Wire this into [MultiProvider] in main.dart and consume with
-/// `context.watch<ThemeProvider>().themeMode`.
+/// Manages the app-wide theme mode (light / dark / system).
 class ThemeProvider extends ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.dark; // default matches the current dark UI
+  ThemeMode _themeMode = ThemeMode.dark; // default
 
   ThemeMode get themeMode => _themeMode;
 
   bool get isDark => _themeMode == ThemeMode.dark;
+  bool get isLight => _themeMode == ThemeMode.light;
+  bool get isSystem => _themeMode == ThemeMode.system;
 
   void toggleTheme() {
     _themeMode =

@@ -338,28 +338,43 @@ class _SignupScreenState extends State<SignupScreen> {
                 size: 18),
               const SizedBox(width: 12),
               Expanded(
-                child: TextField(
-                  controller: ctrl,
-                  focusNode: focus,
-                  obscureText: obscure,
-                  keyboardType: type,
-                  onChanged: onChanged,
-                  autocorrect: false,
-                  autofillHints: null,
-                  style: GoogleFonts.dmSans(
-                    color: _textMain, fontSize: 15, fontWeight: FontWeight.w400,
-                  ),
-                  cursorColor: _purple,
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    hintStyle: GoogleFonts.dmSans(
-                      color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
+                    textSelectionTheme: TextSelectionThemeData(
+                      selectionColor: _purple.withOpacity(0.30),
+                      cursorColor: _purple,
+                      selectionHandleColor: _purple,
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    filled: true,
-                    fillColor: Colors.transparent,
+                  ),
+                  child: TextField(
+                    controller: ctrl,
+                    focusNode: focus,
+                    obscureText: obscure,
+                    keyboardType: type,
+                    onChanged: onChanged,
+                    autocorrect: false,
+                    autofillHints: const [],
+                    enableIMEPersonalizedLearning: false,
+                    style: GoogleFonts.dmSans(
+                      color: _textMain, fontSize: 15, fontWeight: FontWeight.w400,
+                    ),
+                    cursorColor: _purple,
+                    decoration: InputDecoration(
+                      hintText: hint,
+                      hintStyle: GoogleFonts.dmSans(
+                        color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                    ),
                   ),
                 ),
               ),
