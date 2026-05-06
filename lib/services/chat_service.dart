@@ -303,6 +303,97 @@ class ChatService extends ChangeNotifier {
     }
   }
 
+  // ── Star a message (toggles locally + Supabase) ─────────────────────────
+  Future<void> toggleStarMessage(String messageId, bool starred) async {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    _messages[idx].isStarred = starred;
+    notifyListeners();
+    try {
+      await supabase
+          .from('messages')
+          .update({'is_starred': starred}).eq('id', messageId);
+    } catch (e) {
+      // revert on failure
+      _messages[idx].isStarred = !starred;
+      notifyListeners();
+      debugPrint('toggleStar error: $e');
+    }
+  }
+
+  // ── Pin a message (toggles locally + Supabase) ───────────────────────────
+  Future<void> togglePinMessage(String messageId, bool pinned) async {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    _messages[idx].isPinned = pinned;
+    notifyListeners();
+    try {
+      await supabase
+          .from('messages')
+          .update({'is_pinned': pinned}).eq('id', messageId);
+    } catch (e) {
+      _messages[idx].isPinned = !pinned;
+      notifyListeners();
+      debugPrint('togglePin error: $e');
+    }
+  }
+
+  // ── React to a message ───────────────────────────────────────────────────
+  Future<void> reactToMessage(String messageId, String? emoji) async {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+    final prev = _messages[idx].reaction;
+    _messages[idx].reaction = emoji;
+    notifyListeners();
+    try {
+      await supabase
+          .from('messages')
+          .update({'reaction': emoji}).eq('id', messageId);
+    } catch (e) {
+      _messages[idx].reaction = prev;
+      notifyListeners();
+      debugPrint('reactToMessage error: $e');
+    }
+  }
+
+  // ── Forward a message (send its content to another chat) ─────────────────
+  Future<void> forwardMessage({
+    required String targetChatId,
+    required MessageModel msg,
+  }) async {
+    try {
+      await sendMessage(
+        chatId: targetChatId,
+        content: msg.content != null ? '↪ ${msg.content}' : null,
+        imageUrl: msg.imageUrl,
+        messageType: msg.messageType,
+      );
+    } catch (e) {
+      debugPrint('forwardMessage error: $e');
+    }
+  }
+
+  // ── Report a message ─────────────────────────────────────────────────────
+  Future<bool> reportMessage({
+    required String messageId,
+    required String reason,
+  }) async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      await supabase.from('message_reports').insert({
+        'message_id': messageId,
+        'reporter_id': userId,
+        'reason': reason,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('reportMessage error: $e');
+      return false;
+    }
+  }
+
   Future<List<RatingModel>> fetchUserRatings(String userId) async {
     try {
       final data = await supabase

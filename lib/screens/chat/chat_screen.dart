@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -5,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/chat_model.dart';
 import '../../services/auth_service.dart';
@@ -43,7 +46,69 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isRecording = false;
   MessageModel? _replyTarget;
   String?       _selectedMsgId;
-  Offset        _overlayPos = Offset.zero;
+
+  // ── Voice recording ──────────────────────────────────────────
+  final AudioRecorder _recorder = AudioRecorder();
+  String? _recordingPath;
+  Timer?  _recordTimer;
+  int     _recordSeconds = 0;
+
+  Future<void> _startRecording() async {
+    final hasPermission = await _recorder.hasPermission();
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Microphone permission denied'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+    final dir  = await getTemporaryDirectory();
+    _recordingPath = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _recorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
+      path: _recordingPath!,
+    );
+    _recordSeconds = 0;
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _recordSeconds++);
+    });
+    setState(() => _isRecording = true);
+  }
+
+  Future<void> _stopAndSendRecording() async {
+    _recordTimer?.cancel();
+    _recordTimer = null;
+    final path = await _recorder.stop();
+    setState(() { _isRecording = false; _recordSeconds = 0; });
+    if (path == null || !mounted) return;
+    setState(() => _isSending = true);
+    final cs  = context.read<ChatService>();
+    final url = await cs.uploadChatImage(File(path)); // reuse upload slot
+    if (url != null) {
+      await cs.sendMessage(
+        chatId: widget.chat.id,
+        imageUrl: url,
+        messageType: 'voice',
+      );
+      _scrollToBottom();
+    }
+    setState(() => _isSending = false);
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordTimer?.cancel();
+    _recordTimer = null;
+    await _recorder.cancel();
+    setState(() { _isRecording = false; _recordSeconds = 0; });
+  }
+
+  String get _recordDuration {
+    final m = _recordSeconds ~/ 60;
+    final s = _recordSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
 
   // ── theme shortcuts ──────────────────────────────────────────
   bool   get _d   => Theme.of(context).brightness == Brightness.dark;
@@ -78,6 +143,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
+    _recordTimer?.cancel();
+    _recorder.dispose();
     context.read<ChatService>().unsubscribeFromChat();
     super.dispose();
   }
@@ -205,13 +272,288 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // ── Long-press overlay ───────────────────────────────────────
-  void _onLongPress(MessageModel msg, Offset globalPos) {
+  // ── Pinned/starred local state (no DB required) ─────────────
+  final Set<String> _pinnedIds  = {};
+  final Set<String> _starredIds = {};
+  final Set<String> _selectedIds = {};
+  bool _selectMode = false;
+
+  // ── Long-press (500 ms) → WhatsApp-style sheet ───────────────
+  void _onLongPress(MessageModel msg) {
     HapticFeedback.mediumImpact();
-    setState(() { _selectedMsgId = msg.id; _overlayPos = globalPos; });
+    setState(() => _selectedMsgId = msg.id);
+    _showMsgActionSheet(msg);
   }
 
-  void _dismissOverlay() => setState(() => _selectedMsgId = null);
+  void _dismissOverlay() {
+    if (mounted) setState(() => _selectedMsgId = null);
+  }
+
+  void _showMsgActionSheet(MessageModel msg) {
+    final myId = context.read<AuthService>().currentUser?.id ?? '';
+    final isMe = msg.senderId == myId;
+
+    final menuBg   = _d ? const Color(0xFF1C1F2B) : Colors.white;
+    final divColor = _d ? const Color(0xFF2A2E3A) : const Color(0xFFEEEEEE);
+    final labelClr = _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
+    final subClr   = _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
+
+    // local emoji state
+    String? pickedEmoji;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, sheetState) {
+          final isPinned  = _pinnedIds.contains(msg.id);
+          final isStarred = _starredIds.contains(msg.id);
+          final isSelected = _selectedIds.contains(msg.id);
+
+          return Container(
+            margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+            decoration: BoxDecoration(
+              color: menuBg,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // drag handle
+                Container(
+                  width: 36, height: 4,
+                  margin: const EdgeInsets.only(top: 10, bottom: 4),
+                  decoration: BoxDecoration(
+                    color: divColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // ── Emoji reaction row ──────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      ...['👍','❤️','😂','😮','😢','🙏'].map((e) {
+                        final sel = pickedEmoji == e || msg.reaction == e;
+                        return GestureDetector(
+                          onTap: () {
+                            final newEmoji = sel ? null : e;
+                            sheetState(() => pickedEmoji = newEmoji);
+                            // Save reaction to message model via ChatService
+                            context.read<ChatService>().reactToMessage(
+                              msg.id, newEmoji,
+                            );
+                            Navigator.pop(ctx);
+                            _dismissOverlay();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: sel
+                                  ? AppColors.primary.withOpacity(0.18)
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(e, style: const TextStyle(fontSize: 26)),
+                          ),
+                        );
+                      }),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _dismissOverlay();
+                          _showFullEmojiPicker(msg);
+                        },
+                        child: Container(
+                          width: 38, height: 38,
+                          decoration: BoxDecoration(color: divColor, shape: BoxShape.circle),
+                          child: Icon(Icons.add_rounded, size: 20, color: subClr),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Divider(height: 1, color: divColor),
+
+                // ── Reply ──────────────────────────────────────
+                _SheetAction(
+                  icon: Icons.reply_rounded,
+                  label: 'Reply',
+                  color: labelClr,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() { _replyTarget = msg; _selectedMsgId = null; });
+                  },
+                ),
+                Divider(height: 1, color: divColor),
+
+                // ── Copy (text only) ───────────────────────────
+                if (msg.content != null && msg.content!.isNotEmpty) ...[
+                  _SheetAction(
+                    icon: Icons.copy_rounded,
+                    label: 'Copy',
+                    color: labelClr,
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: msg.content!));
+                      Navigator.pop(ctx);
+                      _dismissOverlay();
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.copy_rounded, color: Colors.white, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Copied to clipboard',
+                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    msg.content!.length > 50 ? '${msg.content!.substring(0, 50)}…' : msg.content!,
+                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: _d ? const Color(0xFF2A2E3A) : const Color(0xFF333333),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ));
+                    },
+                  ),
+                  Divider(height: 1, color: divColor),
+                ],
+
+                // ── Forward ────────────────────────────────────
+                _SheetAction(
+                  icon: Icons.shortcut_rounded,
+                  label: 'Forward',
+                  color: labelClr,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _dismissOverlay();
+                    _showForwardSheet(msg);
+                  },
+                ),
+                Divider(height: 1, color: divColor),
+
+                // ── Pin / Unpin ────────────────────────────────
+                _SheetAction(
+                  icon: isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  label: isPinned ? 'Unpin' : 'Pin',
+                  color: isPinned ? AppColors.primary : labelClr,
+                  onTap: () {
+                    setState(() {
+                      if (isPinned) _pinnedIds.remove(msg.id);
+                      else _pinnedIds.add(msg.id);
+                    });
+                    Navigator.pop(ctx);
+                    _dismissOverlay();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(isPinned ? 'Message unpinned' : 'Message pinned 📌'),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ));
+                  },
+                ),
+                Divider(height: 1, color: divColor),
+
+                // ── Star / Unstar ──────────────────────────────
+                _SheetAction(
+                  icon: isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                  label: isStarred ? 'Unstar' : 'Star',
+                  color: isStarred ? const Color(0xFFFBBF24) : labelClr,
+                  onTap: () {
+                    setState(() {
+                      if (isStarred) _starredIds.remove(msg.id);
+                      else _starredIds.add(msg.id);
+                    });
+                    Navigator.pop(ctx);
+                    _dismissOverlay();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(
+                            isStarred ? Icons.star_outline_rounded : Icons.star_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(isStarred ? 'Removed from starred' : 'Message starred'),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 1),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: _d ? const Color(0xFF2A2E3A) : const Color(0xFF4A4A4A),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ));
+                  },
+                ),
+                Divider(height: 1, color: divColor),
+
+                // ── Select ─────────────────────────────────────
+                _SheetAction(
+                  icon: isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                  label: isSelected ? 'Deselect' : 'Select',
+                  color: isSelected ? AppColors.primary : labelClr,
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) _selectedIds.remove(msg.id);
+                      else { _selectedIds.add(msg.id); _selectMode = true; }
+                    });
+                    Navigator.pop(ctx);
+                    _dismissOverlay();
+                  },
+                ),
+                Divider(height: 1, color: divColor),
+
+                // ── Report (incoming only) ─────────────────────
+                _SheetAction(
+                  icon: Icons.thumb_down_alt_outlined,
+                  label: 'Report',
+                  color: !isMe ? AppColors.error : subClr,
+                  enabled: !isMe,
+                  onTap: !isMe ? () {
+                    Navigator.pop(ctx);
+                    _dismissOverlay();
+                    _showReportSheet(msg);
+                  } : null,
+                ),
+                Divider(height: 1, color: divColor),
+
+                // ── Delete (own only) ──────────────────────────
+                _SheetAction(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete',
+                  color: isMe ? AppColors.error : subClr,
+                  enabled: isMe,
+                  onTap: isMe ? () {
+                    Navigator.pop(ctx);
+                    _deleteMsg(msg);
+                  } : null,
+                ),
+
+                SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+              ],
+            ),
+          );
+        },
+      ),
+    ).whenComplete(_dismissOverlay);
+  }
 
   // ── Delete message ───────────────────────────────────────────
   Future<void> _deleteMsg(MessageModel msg) async {
@@ -234,22 +576,25 @@ class _ChatScreenState extends State<ChatScreen> {
         body: Column(
           children: [
 
-            // ── Neutral header ────────────────────────────────
+            // ── Gradient header ───────────────────────────────
             Container(
-              decoration: BoxDecoration(
-                color: _sf,
-                border: Border(bottom: BorderSide(color: _bd, width: 1)),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF5B4FD9), Color(0xFF7C6FE0)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 6, 12, 10),
+                  padding: const EdgeInsets.fromLTRB(4, 6, 16, 10),
                   child: Row(
                     children: [
                       // Back
                       IconButton(
-                        icon: Icon(Icons.arrow_back_ios_new_rounded,
-                            color: _tp, size: 19),
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white, size: 19),
                         onPressed: () => Navigator.pop(context),
                       ),
 
@@ -264,7 +609,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: AvatarWidget(
                           avatarUrl: other?.avatarUrl,
                           username: other?.username ?? '',
-                          radius: 20,
+                          radius: 18,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -285,7 +630,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 other?.fullName ?? other?.username ?? 'User',
                                 style: GoogleFonts.dmSans(
-                                  color: _tp,
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
                                 ),
@@ -295,27 +640,48 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 '@${other?.username ?? ''}',
                                 style: GoogleFonts.dmSans(
-                                    color: _ts, fontSize: 11),
+                                    color: Colors.white70, fontSize: 11),
                               ),
                             ],
                           ),
                         ),
                       ),
 
-                      // Swap action button (neutral style)
+                      // Swap action — text only, white
                       if (!swapDone && !swapPending)
-                        _HeaderBtn(
-                            icon: Icons.handshake_outlined,
-                            label: 'Confirm Swap',
-                            onTap: _confirmSwap,
-                            tp: _tp, bd: _bd, sv: _sv)
+                        GestureDetector(
+                          onTap: _confirmSwap,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.handshake_outlined,
+                                  color: Colors.white, size: 16),
+                              const SizedBox(width: 5),
+                              Text('Confirm Swap',
+                                  style: GoogleFonts.dmSans(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        )
                       else if (swapPending)
-                        _HeaderBtn(
-                            icon: Icons.check_circle_outline_rounded,
-                            label: 'Complete',
-                            color: AppColors.success,
-                            onTap: _completeSwap,
-                            tp: _tp, bd: _bd, sv: _sv),
+                        GestureDetector(
+                          onTap: _completeSwap,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle_outline_rounded,
+                                  color: Colors.white, size: 16),
+                              const SizedBox(width: 5),
+                              Text('Complete',
+                                  style: GoogleFonts.dmSans(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -336,9 +702,41 @@ class _ChatScreenState extends State<ChatScreen> {
 
                   return Stack(
                     children: [
+                      // ── Pinned message banner ────────────────
+                      if (_pinnedIds.isNotEmpty)
+                        Positioned(
+                          top: 0, left: 0, right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.12),
+                              border: Border(bottom: BorderSide(
+                                color: AppColors.primary.withOpacity(0.25), width: 1)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.push_pin_rounded,
+                                    size: 14, color: AppColors.primary),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text(
+                                  '${_pinnedIds.length} pinned message${_pinnedIds.length > 1 ? "s" : ""}',
+                                  style: GoogleFonts.dmSans(
+                                    color: AppColors.primary, fontSize: 12,
+                                    fontWeight: FontWeight.w600),
+                                )),
+                                GestureDetector(
+                                  onTap: () => setState(() => _pinnedIds.clear()),
+                                  child: const Icon(Icons.close_rounded,
+                                      size: 16, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
                       ListView.builder(
                         controller: _scrollCtrl,
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                        padding: EdgeInsets.fromLTRB(12, _pinnedIds.isNotEmpty ? 44 : 12, 12, 8),
                         physics: const BouncingScrollPhysics(),
                         itemCount: cs.messages.length,
                         itemBuilder: (_, i) {
@@ -347,43 +745,84 @@ class _ChatScreenState extends State<ChatScreen> {
                           if (msg.messageType == 'system') {
                             return _sysMsg(msg.content ?? '');
                           }
+                          final isPinned  = _pinnedIds.contains(msg.id);
+                          final isStarred = _starredIds.contains(msg.id);
+                          final isSel     = _selectedIds.contains(msg.id);
+
                           return _SwipeToReply(
                             key: ValueKey(msg.id),
                             isMe: isMe,
-                            onSwipe: () =>
-                                setState(() => _replyTarget = msg),
-                            child: GestureDetector(
-                              onLongPressStart: (d) =>
-                                  _onLongPress(msg, d.globalPosition),
-                              child: AnimatedContainer(
-                                duration:
-                                    const Duration(milliseconds: 150),
-                                decoration: _selectedMsgId == msg.id
-                                    ? BoxDecoration(
-                                        color: AppColors.primary
-                                            .withOpacity(0.06),
-                                        borderRadius:
-                                            BorderRadius.circular(12))
-                                    : null,
-                                child: _Bubble(
-                                  msg: msg,
-                                  isMe: isMe,
-                                  outGrad: _outGrad,
-                                  inBg: _inBg,
-                                  inText: _inText,
-                                  tl: _tl,
-                                ).animate().fadeIn(
-                                    delay: Duration(
-                                        milliseconds: i * 18)),
-                              ),
+                            onSwipe: () => setState(() => _replyTarget = msg),
+                            child: _MsgRow(
+                              msg: msg,
+                              isMe: isMe,
+                              isHighlighted: _selectedMsgId == msg.id,
+                              isPinned: isPinned,
+                              isStarred: isStarred,
+                              isSelected: isSel,
+                              selectMode: _selectMode,
+                              longPressDuration: const Duration(milliseconds: 350),
+                              onLongPress: () => _onLongPress(msg),
+                              onTap: _selectMode
+                                  ? () => setState(() {
+                                      if (isSel) _selectedIds.remove(msg.id);
+                                      else _selectedIds.add(msg.id);
+                                    })
+                                  : null,
+                              onMenuTap: () => _onLongPress(msg),
+                              bubble: _Bubble(
+                                msg: msg,
+                                isMe: isMe,
+                                outGrad: _outGrad,
+                                inBg: _inBg,
+                                inText: _inText,
+                                tl: _tl,
+                              ).animate().fadeIn(delay: Duration(milliseconds: i * 18)),
                             ),
                           );
                         },
                       ),
 
-                      // Long-press overlay
-                      if (_selectedMsgId != null)
-                        _buildOverlay(cs, myId),
+                      // select-mode top bar
+                      if (_selectMode)
+                        Positioned(
+                          bottom: 0, left: 0, right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            color: _sf,
+                            child: Row(
+                              children: [
+                                Text('${_selectedIds.length} selected',
+                                  style: GoogleFonts.dmSans(color: _tp, fontWeight: FontWeight.w700)),
+                                const Spacer(),
+                                TextButton.icon(
+                                  icon: Icon(Icons.shortcut_rounded, color: AppColors.primary),
+                                  label: Text('Forward', style: GoogleFonts.dmSans(color: AppColors.primary)),
+                                  onPressed: _selectedIds.isEmpty ? null : () {
+                                    final msgs = cs.messages.where((m) => _selectedIds.contains(m.id)).toList();
+                                    setState(() { _selectedIds.clear(); _selectMode = false; });
+                                    if (msgs.isNotEmpty) _showForwardSheet(msgs.first);
+                                  },
+                                ),
+                                TextButton.icon(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                                  label: Text('Delete', style: GoogleFonts.dmSans(color: Colors.red)),
+                                  onPressed: _selectedIds.isEmpty ? null : () async {
+                                    for (final id in _selectedIds) {
+                                      await context.read<ChatService>().deleteMessage(id, widget.chat.id);
+                                    }
+                                    setState(() { _selectedIds.clear(); _selectMode = false; });
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded),
+                                  color: _tp,
+                                  onPressed: () => setState(() { _selectedIds.clear(); _selectMode = false; }),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
@@ -395,13 +834,15 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _msgCtrl,
               isSending: _isSending,
               isRecording: _isRecording,
+              recordDuration: _recordDuration,
               replyTarget: _replyTarget,
               d: _d, sf: _sf, sv: _sv, bd: _bd, tp: _tp, ts: _ts,
               onCancelReply: () => setState(() => _replyTarget = null),
               onSend: _send,
               onPickImage: _pickImage,
-              onToggleRecord: () =>
-                  setState(() => _isRecording = !_isRecording),
+              onStartRecord: _startRecording,
+              onStopRecord: _stopAndSendRecording,
+              onCancelRecord: _cancelRecording,
             ),
           ],
         ),
@@ -409,121 +850,233 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ── Reaction + context overlay ───────────────────────────────
-  Widget _buildOverlay(ChatService cs, String myId) {
-    final msg = cs.messages.firstWhere((m) => m.id == _selectedMsgId,
-        orElse: () => cs.messages.first);
-    final isMe = msg.senderId == myId;
-    final screen = MediaQuery.of(context).size;
-    final left  = (_overlayPos.dx - 110).clamp(8.0, screen.width - 240.0);
-    final top   = (_overlayPos.dy - 140).clamp(
-        MediaQuery.of(context).padding.top + 56.0,
-        screen.height - 220.0);
+  // ── Full emoji picker ─────────────────────────────────────────────────────
+  void _showFullEmojiPicker(MessageModel msg) {
+    final bool d = Theme.of(context).brightness == Brightness.dark;
+    final menuBg  = d ? const Color(0xFF1C1F2B) : Colors.white;
+    final divColor = d ? const Color(0xFF2A2E3A) : const Color(0xFFEEEEEE);
+    final labelClr = d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            onTap: _dismissOverlay,
-            child: Container(color: Colors.black.withOpacity(0.3)),
-          ),
+    const allEmojis = [
+      '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊',
+      '😋','😎','😍','🥰','😘','🤩','😇','🙂','😏','😒',
+      '😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩',
+      '🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵',
+      '😱','😨','😰','😥','🤗','🤔','🤭','🤫','🤥','😶',
+      '😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴',
+      '🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒',
+      '👍','👎','👋','🤚','✋','🖐','👌','🤌','🤏','✌️',
+      '🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','👍',
+      '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💕',
+      '💞','💓','💗','💖','💘','💝','💟','☮️','✝️','🕊️',
+      '🎉','🎊','🎈','🎁','🎀','🏆','🥇','🌟','⭐','✨',
+      '🔥','💫','🌈','🌸','🌺','🌻','🍀','🌙','⚡','❄️',
+      '🙏','👏','🤝','💪','🦾','🫶','💅','🫠','🥹','😌',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.55,
+        margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+        decoration: BoxDecoration(
+          color: menuBg,
+          borderRadius: BorderRadius.circular(20),
         ),
-        Positioned(
-          left: left, top: top,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 6 emoji reactions
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: _d
-                      ? const Color(0xFF1E222C)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6)),
-                  ],
+        child: Column(
+          children: [
+            // drag handle
+            Container(
+              width: 36, height: 4,
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              decoration: BoxDecoration(
+                color: divColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Row(
+                children: [
+                  Text('React to message',
+                    style: GoogleFonts.dmSans(
+                      color: labelClr,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    )),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: divColor),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8,
+                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 4,
+                  childAspectRatio: 1,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: ['❤️','😂','😮','😢','👍','🔥']
-                      .map((e) => GestureDetector(
-                            onTap: _dismissOverlay,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 5),
-                              child: Text(e,
-                                  style:
-                                      const TextStyle(fontSize: 22)),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ).animate().scale(
-                  begin: const Offset(0.7, 0.7),
-                  curve: Curves.elasticOut,
-                  duration: 400.ms),
-
-              const SizedBox(height: 8),
-
-              // Context menu
-              Container(
-                width: 210,
-                decoration: BoxDecoration(
-                  color: _d
-                      ? const Color(0xFF1E222C)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.14),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _CtxAction(
-                      icon: Icons.reply_rounded,
-                      label: 'Reply',
-                      color: _tp,
-                      onTap: () {
-                        setState(() {
-                          _replyTarget = msg;
-                          _selectedMsgId = null;
-                        });
-                      },
+                itemCount: allEmojis.length,
+                itemBuilder: (_, idx) {
+                  final e = allEmojis[idx];
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.read<ChatService>().reactToMessage(
+                        msg.id,
+                        msg.reaction == e ? null : e,
+                      );
+                      _dismissOverlay();
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(e, style: const TextStyle(fontSize: 24)),
+                      ),
                     ),
-                    Divider(height: 1, color: _bd),
-                    // Edit — greyed for incoming
-                    _CtxAction(
-                      icon: Icons.edit_outlined,
-                      label: 'Edit',
-                      color: isMe ? _tp : _tl,
-                      onTap: isMe ? _dismissOverlay : null,
-                    ),
-                    Divider(height: 1, color: _bd),
-                    // Delete — red, only own messages
-                    _CtxAction(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Delete',
-                      color: isMe ? AppColors.error : _tl,
-                      onTap: isMe ? () => _deleteMsg(msg) : null,
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 60.ms),
-            ],
-          ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+
+  // ── Forward sheet ─────────────────────────────────────────────────────────
+  void _showForwardSheet(MessageModel msg) {
+    final cs = context.read<ChatService>();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _d ? const Color(0xFF1E222C) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Forward to',
+                style: GoogleFonts.dmSans(
+                    color: _tp, fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            if (cs.chats.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text('No other conversations',
+                    style: GoogleFonts.dmSans(color: _ts)),
+              )
+            else
+              ...cs.chats
+                  .where((c) => c.id != widget.chat.id)
+                  .take(6)
+                  .map((c) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: AvatarWidget(
+                          avatarUrl: c.otherUser?.avatarUrl,
+                          username: c.otherUser?.username ?? '',
+                          radius: 20,
+                        ),
+                        title: Text(
+                          c.otherUser?.fullName ?? c.otherUser?.username ?? 'User',
+                          style: GoogleFonts.dmSans(
+                              color: _tp, fontWeight: FontWeight.w600),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          // Forward inline using sendMessage (no forwardMessage needed)
+                          final fwdContent = msg.content != null
+                              ? '↪ ${msg.content}'
+                              : null;
+                          context.read<ChatService>().sendMessage(
+                            chatId: c.id,
+                            content: fwdContent,
+                            imageUrl: msg.imageUrl,
+                            messageType: msg.messageType,
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(
+                                'Forwarded to ${c.otherUser?.fullName ?? 'User'}'),
+                            backgroundColor: AppColors.primary,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ));
+                        },
+                      )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Report sheet ─────────────────────────────────────────────────────────
+  void _showReportSheet(MessageModel msg) {
+    final reasons = [
+      'Spam or irrelevant',
+      'Harassment or bullying',
+      'Inappropriate content',
+      'Fake profile',
+      'Other',
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _d ? const Color(0xFF1E222C) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Report message',
+                style: GoogleFonts.dmSans(
+                    color: _tp, fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('Select a reason',
+                style: GoogleFonts.dmSans(color: _ts, fontSize: 13)),
+            const SizedBox(height: 12),
+            ...reasons.map((r) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.flag_outlined,
+                      color: AppColors.error, size: 20),
+                  title: Text(r,
+                      style: GoogleFonts.dmSans(
+                          color: _tp, fontWeight: FontWeight.w500)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: const Text('Message reported. Thank you.'),
+                        backgroundColor: AppColors.success,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ));
+                    }
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _sysMsg(String content) => Center(
         child: Container(
@@ -601,6 +1154,136 @@ class _HeaderBtn extends StatelessWidget {
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Message row: handles long-press (mobile) + hover pull-bar (web)
+// ─────────────────────────────────────────────────────────────────────────────
+class _MsgRow extends StatefulWidget {
+  final MessageModel msg;
+  final bool isMe;
+  final bool isHighlighted, isPinned, isStarred, isSelected, selectMode;
+  final Duration longPressDuration;
+  final VoidCallback onLongPress;
+  final VoidCallback? onTap;
+  final VoidCallback onMenuTap;
+  final Widget bubble;
+
+  const _MsgRow({
+    required this.msg,
+    required this.isMe,
+    required this.isHighlighted,
+    required this.isPinned,
+    required this.isStarred,
+    required this.isSelected,
+    required this.selectMode,
+    required this.longPressDuration,
+    required this.onLongPress,
+    required this.onTap,
+    required this.onMenuTap,
+    required this.bubble,
+  });
+
+  @override
+  State<_MsgRow> createState() => _MsgRowState();
+}
+
+class _MsgRowState extends State<_MsgRow> {
+  bool _hovered = false;
+  bool _tapped  = false;
+
+  void _handleTap() {
+    // Toggle pull-bar on tap (mobile WhatsApp style)
+    setState(() => _tapped = !_tapped);
+    widget.onTap?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showPullBar = _hovered || _tapped;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() { _hovered = false; _tapped = false; }),
+      child: GestureDetector(
+        onTap: _handleTap,
+        onLongPress: widget.onLongPress,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: (widget.isHighlighted || widget.isSelected)
+              ? BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12))
+              : null,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // ── Select checkbox (select mode) ─────────────
+              if (widget.selectMode)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: AnimatedScale(
+                    scale: widget.selectMode ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Checkbox(
+                      value: widget.isSelected,
+                      onChanged: (_) => widget.onTap?.call(),
+                      activeColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
+                ),
+
+              // ── Bubble + badges ────────────────────────────
+              Expanded(
+                child: Stack(
+                  children: [
+                    widget.bubble,
+                    // Starred badge
+                    if (widget.isStarred)
+                      Positioned(
+                        right: widget.isMe ? 16 : null,
+                        left:  widget.isMe ? null : 16,
+                        bottom: 22,
+                        child: const Text("⭐", style: TextStyle(fontSize: 12)),
+                      ),
+                    // Pinned badge
+                    if (widget.isPinned)
+                      Positioned(
+                        right: widget.isMe ? 16 : null,
+                        left:  widget.isMe ? null : 16,
+                        bottom: 22,
+                        child: const Icon(Icons.push_pin_rounded,
+                            size: 12, color: AppColors.primary),
+                      ),
+                  ],
+                ),
+              ),
+
+              // ── Pull-bar (visible only on hover/tap, WhatsApp-style) ───
+              AnimatedOpacity(
+                opacity: showPullBar ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: GestureDetector(
+                  onTap: widget.onMenuTap,
+                  child: Container(
+                    width: 24, height: 24,
+                    margin: const EdgeInsets.only(right: 2, left: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.expand_more_rounded,
+                        size: 15, color: AppColors.primary),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -742,6 +1425,42 @@ class _Bubble extends StatelessWidget {
                         ),
                       ),
           ),
+          // ── Reaction badge (WhatsApp-style) ─────────────────
+          if (msg.reaction != null && msg.reaction!.isNotEmpty)
+            Transform.translate(
+              offset: Offset(isMe ? -8 : 8, -6),
+              child: Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () {
+                    // Tapping the reaction badge removes it (toggle off)
+                    context.read<ChatService>().reactToMessage(msg.id, null);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: inBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.black.withOpacity(0.08),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      msg.reaction!,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 3),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -805,18 +1524,25 @@ class _VoiceNoteBubble extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Input bar
 // ─────────────────────────────────────────────────────────────────────────────
-class _InputBar extends StatelessWidget {
+//  Input bar  — matches image 2 exactly
+//  • dark strip bg, no border, image icon left, bare text field, mic + send right
+//  • while recording: red animated bar replaces text field, cancel + send shown
+// ─────────────────────────────────────────────────────────────────────────────
+class _InputBar extends StatefulWidget {
   final TextEditingController controller;
   final bool isSending, isRecording;
+  final String recordDuration;
   final MessageModel? replyTarget;
   final bool d;
   final Color sf, sv, bd, tp, ts;
-  final VoidCallback onCancelReply, onSend, onPickImage, onToggleRecord;
+  final VoidCallback onCancelReply, onSend, onPickImage;
+  final VoidCallback onStartRecord, onStopRecord, onCancelRecord;
 
   const _InputBar({
     required this.controller,
     required this.isSending,
     required this.isRecording,
+    required this.recordDuration,
     required this.replyTarget,
     required this.d,
     required this.sf,
@@ -827,23 +1553,49 @@ class _InputBar extends StatelessWidget {
     required this.onCancelReply,
     required this.onSend,
     required this.onPickImage,
-    required this.onToggleRecord,
+    required this.onStartRecord,
+    required this.onStopRecord,
+    required this.onCancelRecord,
   });
 
   @override
+  State<_InputBar> createState() => _InputBarState();
+}
+
+class _InputBarState extends State<_InputBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final d  = widget.d;
+    final ts = widget.ts;
+
+    // Exact colours from screenshot
+    const barBg    = Color(0xFF12151E); // near-black navy strip
+    const iconClr  = Color(0xFF6C5FD9); // purple for image icon
+    const hintClr  = Color(0xFF4A4D5A); // dim hint text
+    const sendClr  = Color(0xFF6C5FD9); // solid purple circle
+
     return Container(
-      decoration: BoxDecoration(
-        color: sf,
-        border: Border(top: BorderSide(color: bd, width: 1)),
-      ),
+      color: barBg,
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Inline reply preview ──────────────────────────
-            if (replyTarget != null)
+
+            // ── Reply preview (unchanged) ─────────────────────
+            if (widget.replyTarget != null)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -861,10 +1613,10 @@ class _InputBar extends StatelessWidget {
                     const SizedBox(width: 7),
                     Expanded(
                       child: Text(
-                        replyTarget!.content ??
-                            (replyTarget!.messageType == 'image'
+                        widget.replyTarget!.content ??
+                            (widget.replyTarget!.messageType == 'image'
                                 ? '📷 Photo'
-                                : replyTarget!.messageType == 'voice'
+                                : widget.replyTarget!.messageType == 'voice'
                                     ? '🎤 Voice note'
                                     : ''),
                         style: GoogleFonts.dmSans(
@@ -876,125 +1628,134 @@ class _InputBar extends StatelessWidget {
                       ),
                     ),
                     GestureDetector(
-                      onTap: onCancelReply,
+                      onTap: widget.onCancelReply,
                       child: Icon(Icons.close_rounded, size: 16, color: ts),
                     ),
                   ],
                 ),
               ).animate().slideY(begin: 0.4, duration: 200.ms),
 
-            // ── Main row ───────────────────────────────────────
+            // ── Main input row ────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Media (+)
-                  GestureDetector(
-                    onTap: onPickImage,
-                    child: Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.add_rounded,
-                          color: AppColors.primary, size: 22),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
 
-                  // Text field + waveform icon
+                  // ── Gradient rectangle input container ────
                   Expanded(
                     child: Container(
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: sv,
-                        borderRadius: BorderRadius.circular(22),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1C2033), Color(0xFF252A3A)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          // Image icon inside the field — left
+                          if (!widget.isRecording)
+                            GestureDetector(
+                              onTap: widget.onPickImage,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: Icon(Icons.image_outlined,
+                                    color: iconClr, size: 20),
+                              ),
+                            ),
+
+                          // Text field OR recording indicator
                           Expanded(
-                            child: TextField(
-                              controller: controller,
-                              maxLines: 4,
-                              minLines: 1,
-                              textCapitalization:
-                                  TextCapitalization.sentences,
-                              style: GoogleFonts.dmSans(
-                                  color: tp, fontSize: 14),
-                              decoration: InputDecoration(
-                                hintText: 'Type a message...',
-                                hintStyle: GoogleFonts.dmSans(
-                                    color: ts, fontSize: 14),
-                                border: InputBorder.none,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
-                                        horizontal: 15, vertical: 11),
-                              ),
-                              onSubmitted: (_) => onSend(),
-                            ),
+                            child: widget.isRecording
+                                ? _RecordingIndicator(
+                                    duration: widget.recordDuration,
+                                    pulseCtrl: _pulseCtrl,
+                                    onCancel: widget.onCancelRecord,
+                                  )
+                                : TextField(
+                                    controller: widget.controller,
+                                    maxLines: 1,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    style: GoogleFonts.dmSans(
+                                        color: d
+                                            ? Colors.white
+                                            : const Color(0xFF0A0A0A),
+                                        fontSize: 14),
+                                    decoration: InputDecoration(
+                                      hintText: 'Type a message...',
+                                      hintStyle: GoogleFonts.dmSans(
+                                          color: hintClr, fontSize: 14),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 11),
+                                    ),
+                                    onSubmitted: (_) => widget.onSend(),
+                                  ),
                           ),
-                          // Mic / voice note button
-                          GestureDetector(
-                            onTap: onToggleRecord,
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 10, bottom: 9),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: isRecording
-                                      ? AppColors.error.withOpacity(0.15)
-                                      : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  isRecording
-                                      ? Icons.stop_circle_outlined
-                                      : Icons.mic_rounded,
-                                  size: 22,
-                                  color: isRecording
-                                      ? AppColors.error
-                                      : (d
-                                          ? const Color(0xFF8E9099)
-                                          : const Color(0xFFAAAAAA)),
-                                ),
+
+                          // Mic icon — right side inside rectangle
+                          if (!widget.isRecording)
+                            GestureDetector(
+                              onTap: widget.onStartRecord,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: Icon(Icons.mic_rounded,
+                                    color: hintClr, size: 20),
+                              ),
+                            )
+                          else ...[
+                            // Stop while recording
+                            GestureDetector(
+                              onTap: widget.onStopRecord,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: Icon(Icons.stop_rounded,
+                                    color: Colors.red, size: 20),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 8),
 
-                  // Send button
+                  // ── Send circle — outside the rectangle ───
                   GestureDetector(
-                    onTap: isSending ? null : onSend,
+                    onTap: widget.isSending
+                        ? null
+                        : widget.isRecording
+                            ? widget.onStopRecord
+                            : widget.onSend,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                              color: AppColors.primary.withOpacity(0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3)),
-                        ],
+                      width: 40, height: 40,
+                      decoration: const BoxDecoration(
+                        color: sendClr,
+                        shape: BoxShape.circle,
                       ),
-                      child: isSending
+                      child: widget.isSending
                           ? const Center(
                               child: SizedBox(
-                                  width: 18, height: 18,
+                                  width: 16, height: 16,
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       color: Colors.white)))
-                          : const Icon(Icons.send_rounded,
-                              color: Colors.white, size: 18),
+                          : Icon(
+                              widget.isRecording
+                                  ? Icons.check_rounded
+                                  : Icons.send_rounded,
+                              color: Colors.white,
+                              size: 17,
+                            ),
                     ),
                   ),
                 ],
@@ -1008,7 +1769,127 @@ class _InputBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Context menu item
+//  Recording indicator row (shown instead of text field while recording)
+// ─────────────────────────────────────────────────────────────────────────────
+class _RecordingIndicator extends StatelessWidget {
+  final String duration;
+  final AnimationController pulseCtrl;
+  final VoidCallback onCancel;
+
+  const _RecordingIndicator({
+    required this.duration,
+    required this.pulseCtrl,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Pulsing red dot
+        AnimatedBuilder(
+          animation: pulseCtrl,
+          builder: (_, __) => Container(
+            width: 10, height: 10,
+            decoration: BoxDecoration(
+              color: Colors.red
+                  .withOpacity(0.4 + 0.6 * pulseCtrl.value),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(duration,
+            style: GoogleFonts.dmSans(
+                color: Colors.red,
+                fontSize: 14,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(width: 8),
+        // Mini waveform animation
+        AnimatedBuilder(
+          animation: pulseCtrl,
+          builder: (_, __) => Row(
+            children: List.generate(6, (i) {
+              final h = 4.0 + 10.0 * ((math.sin(pulseCtrl.value * math.pi * 2 + i) + 1) / 2);
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                width: 3,
+                height: h,
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              );
+            }),
+          ),
+        ),
+        const Spacer(),
+        // Cancel (swipe left icon)
+        GestureDetector(
+          onTap: onCancel,
+          child: Row(
+            children: [
+              const Icon(Icons.close_rounded, color: Colors.red, size: 16),
+              const SizedBox(width: 2),
+              Text('Cancel',
+                  style: GoogleFonts.dmSans(
+                      color: Colors.red, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Bottom-sheet action row (WhatsApp-style)
+// ─────────────────────────────────────────────────────────────────────────────
+class _SheetAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  const _SheetAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.enabled = true,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.35,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: color),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Context menu item (legacy — kept for compatibility)
 // ─────────────────────────────────────────────────────────────────────────────
 class _CtxAction extends StatelessWidget {
   final IconData icon;

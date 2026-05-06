@@ -56,6 +56,9 @@ class MessageModel {
   final bool isRead;
   final DateTime createdAt;
   final ProfileModel? sender;
+  bool isStarred;
+  bool isPinned;
+  String? reaction;
 
   MessageModel({
     required this.id,
@@ -67,6 +70,9 @@ class MessageModel {
     this.isRead = false,
     required this.createdAt,
     this.sender,
+    this.isStarred = false,
+    this.isPinned = false,
+    this.reaction,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -83,6 +89,9 @@ class MessageModel {
       sender: json['profiles'] != null
           ? ProfileModel.fromJson(json['profiles'])
           : null,
+      isStarred: json['is_starred'] ?? false,
+      isPinned: json['is_pinned'] ?? false,
+      reaction: json['reaction'],
     );
   }
 }
