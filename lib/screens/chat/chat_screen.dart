@@ -40,32 +40,35 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final _msgCtrl    = TextEditingController();
+  final _msgCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  bool _isSending   = false;
+  bool _isSending = false;
   bool _isRecording = false;
   MessageModel? _replyTarget;
-  String?       _selectedMsgId;
+  String? _selectedMsgId;
 
   // ── Voice recording ──────────────────────────────────────────
   final AudioRecorder _recorder = AudioRecorder();
   String? _recordingPath;
-  Timer?  _recordTimer;
-  int     _recordSeconds = 0;
+  Timer? _recordTimer;
+  int _recordSeconds = 0;
 
   Future<void> _startRecording() async {
     final hasPermission = await _recorder.hasPermission();
     if (!hasPermission) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Microphone permission denied'),
-          behavior: SnackBarBehavior.floating,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Microphone permission denied'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return;
     }
-    final dir  = await getTemporaryDirectory();
-    _recordingPath = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final dir = await getTemporaryDirectory();
+    _recordingPath =
+        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
     await _recorder.start(
       const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
       path: _recordingPath!,
@@ -81,10 +84,13 @@ class _ChatScreenState extends State<ChatScreen> {
     _recordTimer?.cancel();
     _recordTimer = null;
     final path = await _recorder.stop();
-    setState(() { _isRecording = false; _recordSeconds = 0; });
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+    });
     if (path == null || !mounted) return;
     setState(() => _isSending = true);
-    final cs  = context.read<ChatService>();
+    final cs = context.read<ChatService>();
     final url = await cs.uploadChatImage(File(path)); // reuse upload slot
     if (url != null) {
       await cs.sendMessage(
@@ -101,7 +107,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _recordTimer?.cancel();
     _recordTimer = null;
     await _recorder.cancel();
-    setState(() { _isRecording = false; _recordSeconds = 0; });
+    setState(() {
+      _isRecording = false;
+      _recordSeconds = 0;
+    });
   }
 
   String get _recordDuration {
@@ -111,24 +120,26 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   // ── theme shortcuts ──────────────────────────────────────────
-  bool   get _d   => Theme.of(context).brightness == Brightness.dark;
-  Color  get _bg  => _d ? const Color(0xFF0E1117) : Colors.white;
-  Color  get _sf  => _d ? const Color(0xFF161A22) : Colors.white;
-  Color  get _sv  => _d ? const Color(0xFF1E222C) : const Color(0xFFF2F2F5);
-  Color  get _bd  => _d ? const Color(0xFF272B36) : const Color(0xFFEAEAEA);
-  Color  get _tp  => _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
-  Color  get _ts  => _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
-  Color  get _tl  => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
+  bool get _d => Theme.of(context).brightness == Brightness.dark;
+  Color get _bg => _d ? const Color(0xFF0E1117) : Colors.white;
+  Color get _sf => _d ? const Color(0xFF161A22) : Colors.white;
+  Color get _sv => _d ? const Color(0xFF1E222C) : const Color(0xFFF2F2F5);
+  Color get _bd => _d ? const Color(0xFF272B36) : const Color(0xFFEAEAEA);
+  Color get _tp => _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
+  Color get _ts => _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
+  Color get _tl => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
 
   // Outgoing: slate-blue gradient (dark) / primary violet-pink (light)
   LinearGradient get _outGrad => _d
       ? const LinearGradient(
           colors: [Color(0xFF3B4EAD), Color(0xFF6C47FF)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight)
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        )
       : AppColors.primaryGradient;
 
   // Incoming: deep-lavender (dark) / pale lavender (light)
-  Color get _inBg   => _d ? const Color(0xFF262D3D) : const Color(0xFFF0EEFF);
+  Color get _inBg => _d ? const Color(0xFF262D3D) : const Color(0xFFF0EEFF);
   Color get _inText => _d ? const Color(0xFFD8DCF0) : const Color(0xFF2D2D2D);
 
   @override
@@ -166,27 +177,388 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _msgCtrl.text.trim();
     if (text.isEmpty) return;
     _msgCtrl.clear();
-    setState(() { _isSending = true; _replyTarget = null; });
+    setState(() {
+      _isSending = true;
+      _replyTarget = null;
+    });
     await context.read<ChatService>().sendMessage(
-        chatId: widget.chat.id, content: text);
+      chatId: widget.chat.id,
+      content: text,
+    );
     setState(() => _isSending = false);
     _scrollToBottom();
   }
 
   // ── Pick & send image ────────────────────────────────────────
   Future<void> _pickImage() async {
-    final p = await ImagePicker()
-        .pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final p = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
     if (p == null) return;
     setState(() => _isSending = true);
-    final cs  = context.read<ChatService>();
+    final cs = context.read<ChatService>();
     final url = await cs.uploadChatImage(File(p.path));
     if (url != null) {
       await cs.sendMessage(
-          chatId: widget.chat.id, imageUrl: url, messageType: 'image');
+        chatId: widget.chat.id,
+        imageUrl: url,
+        messageType: 'image',
+      );
       _scrollToBottom();
     }
     setState(() => _isSending = false);
+  }
+
+  // ── Schedule session sheet ───────────────────────────────────
+  void _showScheduleSheet() {
+    final bool d = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = d ? const Color(0xFF1A1D2B) : Colors.white;
+    final labelClr = d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
+    final subClr = d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
+    final chipBg = d ? const Color(0xFF262D3D) : const Color(0xFFF0EEFF);
+    final chipBorder = d ? const Color(0xFF353B50) : const Color(0xFFDDD8FF);
+
+    // Date options: next 6 days from today
+    final today = DateTime.now();
+    final dates = List.generate(6, (i) => today.add(Duration(days: i)));
+    final times = [
+      '10:00 AM',
+      '2:00 PM',
+      '4:00 PM',
+      '6:00 PM',
+      '7:00 PM',
+      '8:00 PM',
+    ];
+
+    int selDate = 2; // Mon highlighted like screenshot
+    int selTime = 2; // 4:00 PM
+
+    final dayFmt = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final monFmt = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    String fmtDate(DateTime d) =>
+        '${dayFmt[d.weekday - 1]} ${monFmt[d.month - 1]} ${d.day}';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSS) => Container(
+          margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // drag handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: d
+                          ? const Color(0xFF353B50)
+                          : const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                Row(
+                  children: [
+                    const Text('📅', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Schedule Session',
+                      style: GoogleFonts.dmSans(
+                        color: labelClr,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Pick a time — both of you will get a reminder 30 mins before',
+                  style: GoogleFonts.dmSans(
+                    color: subClr,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // DATE label
+                Text(
+                  'DATE',
+                  style: GoogleFonts.dmSans(
+                    color: subClr,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Date chips grid (2 rows of 3)
+                ...[
+                  [0, 1, 2],
+                  [3, 4, 5],
+                ].map(
+                  (row) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: row.map((idx) {
+                        final selected = selDate == idx;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => setSS(() => selDate = idx),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? const Color(0xFF4A47C4)
+                                    : chipBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selected
+                                      ? Colors.transparent
+                                      : chipBorder,
+                                  width: 1,
+                                ),
+                                boxShadow: selected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF4A47C4,
+                                          ).withOpacity(0.4),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  fmtDate(dates[idx]),
+                                  style: GoogleFonts.dmSans(
+                                    color: selected ? Colors.white : labelClr,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // TIME label
+                Text(
+                  'TIME',
+                  style: GoogleFonts.dmSans(
+                    color: subClr,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Time chips grid (2 rows of 3)
+                ...[
+                  [0, 1, 2],
+                  [3, 4, 5],
+                ].map(
+                  (row) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: row.map((idx) {
+                        final selected = selTime == idx;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => setSS(() => selTime = idx),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? const Color(0xFF4A47C4)
+                                    : chipBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selected
+                                      ? Colors.transparent
+                                      : chipBorder,
+                                  width: 1,
+                                ),
+                                boxShadow: selected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF4A47C4,
+                                          ).withOpacity(0.4),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  times[idx],
+                                  style: GoogleFonts.dmSans(
+                                    color: selected ? Colors.white : labelClr,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Cancel / Confirm row
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(ctx),
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: d
+                                ? const Color(0xFF262D3D)
+                                : const Color(0xFFF0EEFF),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: chipBorder, width: 1),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.dmSans(
+                                color: labelClr,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          final picked = fmtDate(dates[selDate]);
+                          final time = times[selTime];
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Text(
+                                    '📅',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Session scheduled: $picked at $time',
+                                      style: GoogleFonts.dmSans(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.primaryGradient,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.35),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Confirm Session',
+                              style: GoogleFonts.dmSans(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // ── Confirm swap dialog ──────────────────────────────────────
@@ -195,8 +567,10 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Confirm Swap 🤝',
-            style: GoogleFonts.dmSans(fontWeight: FontWeight.w700)),
+        title: Text(
+          'Confirm Swap 🤝',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
         content: Text(
           'Confirm a skill swap with '
           '${widget.chat.otherUser?.fullName ?? widget.chat.otherUser?.username}?\n\n'
@@ -204,29 +578,45 @@ class _ChatScreenState extends State<ChatScreen> {
           style: GoogleFonts.dmSans(fontSize: 14),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success),
-              child: const Text('Confirm')),
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ),
         ],
       ),
     );
     if (ok == true && mounted) {
       await context.read<ChatService>().confirmSwap(
-          chatId: widget.chat.id,
-          otherUserId: widget.chat.otherUser?.id ?? '',
-          postId: widget.chat.postId);
+        chatId: widget.chat.id,
+        otherUserId: widget.chat.otherUser?.id ?? '',
+        postId: widget.chat.postId,
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Swap confirmed! 🎉'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Swap confirmed! 🎉'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
         setState(() {});
       }
     }
@@ -237,43 +627,69 @@ class _ChatScreenState extends State<ChatScreen> {
     final swaps = await context.read<ChatService>().fetchUserSwaps();
     final swap = swaps.firstWhere(
       (s) => s.chatId == widget.chat.id && s.status == 'pending',
-      orElse: () => SwapModel(id: '', chatId: '', initiatorId: '',
-          receiverId: '', status: 'pending', createdAt: DateTime.now()),
+      orElse: () => SwapModel(
+        id: '',
+        chatId: '',
+        initiatorId: '',
+        receiverId: '',
+        status: 'pending',
+        createdAt: DateTime.now(),
+      ),
     );
     if (swap.id.isEmpty || !mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Mark Swap Complete?',
-            style: GoogleFonts.dmSans(fontWeight: FontWeight.w700)),
+        title: Text(
+          'Mark Swap Complete?',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
         content: const Text('Confirm the skill swap has been completed.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success),
-              child: const Text('Complete')),
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Complete'),
+            ),
+          ),
         ],
       ),
     );
     if (ok == true && mounted) {
       await context.read<ChatService>().markSwapCompleted(
-          swap.id, widget.chat.id);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Swap complete! 🎉 Please rate your experience.'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
+        swap.id,
+        widget.chat.id,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Swap complete! 🎉 Please rate your experience.'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
       setState(() {});
     }
   }
 
   // ── Pinned/starred local state (no DB required) ─────────────
-  final Set<String> _pinnedIds  = {};
+  final Set<String> _pinnedIds = {};
   final Set<String> _starredIds = {};
   final Set<String> _selectedIds = {};
   bool _selectMode = false;
@@ -293,10 +709,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final myId = context.read<AuthService>().currentUser?.id ?? '';
     final isMe = msg.senderId == myId;
 
-    final menuBg   = _d ? const Color(0xFF1C1F2B) : Colors.white;
+    final menuBg = _d ? const Color(0xFF1C1F2B) : Colors.white;
     final divColor = _d ? const Color(0xFF2A2E3A) : const Color(0xFFEEEEEE);
     final labelClr = _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
-    final subClr   = _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
+    final subClr = _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
 
     // local emoji state
     String? pickedEmoji;
@@ -307,7 +723,7 @@ class _ChatScreenState extends State<ChatScreen> {
       isScrollControlled: true,
       builder: (_) => StatefulBuilder(
         builder: (ctx, sheetState) {
-          final isPinned  = _pinnedIds.contains(msg.id);
+          final isPinned = _pinnedIds.contains(msg.id);
           final isStarred = _starredIds.contains(msg.id);
           final isSelected = _selectedIds.contains(msg.id);
 
@@ -322,7 +738,8 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 // drag handle
                 Container(
-                  width: 36, height: 4,
+                  width: 36,
+                  height: 4,
                   margin: const EdgeInsets.only(top: 10, bottom: 4),
                   decoration: BoxDecoration(
                     color: divColor,
@@ -332,11 +749,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 // ── Emoji reaction row ──────────────────────────
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      ...['👍','❤️','😂','😮','😢','🙏'].map((e) {
+                      ...['👍', '❤️', '😂', '😮', '😢', '🙏'].map((e) {
                         final sel = pickedEmoji == e || msg.reaction == e;
                         return GestureDetector(
                           onTap: () {
@@ -344,7 +764,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             sheetState(() => pickedEmoji = newEmoji);
                             // Save reaction to message model via ChatService
                             context.read<ChatService>().reactToMessage(
-                              msg.id, newEmoji,
+                              msg.id,
+                              newEmoji,
                             );
                             Navigator.pop(ctx);
                             _dismissOverlay();
@@ -358,7 +779,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                   : Colors.transparent,
                               shape: BoxShape.circle,
                             ),
-                            child: Text(e, style: const TextStyle(fontSize: 26)),
+                            child: Text(
+                              e,
+                              style: const TextStyle(fontSize: 26),
+                            ),
                           ),
                         );
                       }),
@@ -369,9 +793,17 @@ class _ChatScreenState extends State<ChatScreen> {
                           _showFullEmojiPicker(msg);
                         },
                         child: Container(
-                          width: 38, height: 38,
-                          decoration: BoxDecoration(color: divColor, shape: BoxShape.circle),
-                          child: Icon(Icons.add_rounded, size: 20, color: subClr),
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: divColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.add_rounded,
+                            size: 20,
+                            color: subClr,
+                          ),
                         ),
                       ),
                     ],
@@ -387,7 +819,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: labelClr,
                   onTap: () {
                     Navigator.pop(ctx);
-                    setState(() { _replyTarget = msg; _selectedMsgId = null; });
+                    setState(() {
+                      _replyTarget = msg;
+                      _selectedMsgId = null;
+                    });
                   },
                 ),
                 Divider(height: 1, color: divColor),
@@ -402,34 +837,55 @@ class _ChatScreenState extends State<ChatScreen> {
                       Clipboard.setData(ClipboardData(text: msg.content!));
                       Navigator.pop(ctx);
                       _dismissOverlay();
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Row(
-                          children: [
-                            const Icon(Icons.copy_rounded, color: Colors.white, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Copied to clipboard',
-                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                                  Text(
-                                    msg.content!.length > 50 ? '${msg.content!.substring(0, 50)}…' : msg.content!,
-                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(
+                                Icons.copy_rounded,
+                                color: Colors.white,
+                                size: 16,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Copied to clipboard',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      msg.content!.length > 50
+                                          ? '${msg.content!.substring(0, 50)}…'
+                                          : msg.content!,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: _d
+                              ? const Color(0xFF2A2E3A)
+                              : const Color(0xFF333333),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        duration: const Duration(seconds: 2),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: _d ? const Color(0xFF2A2E3A) : const Color(0xFF333333),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ));
+                      );
                     },
                   ),
                   Divider(height: 1, color: divColor),
@@ -450,69 +906,101 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 // ── Pin / Unpin ────────────────────────────────
                 _SheetAction(
-                  icon: isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                  icon: isPinned
+                      ? Icons.push_pin_rounded
+                      : Icons.push_pin_outlined,
                   label: isPinned ? 'Unpin' : 'Pin',
                   color: isPinned ? AppColors.primary : labelClr,
                   onTap: () {
                     setState(() {
-                      if (isPinned) _pinnedIds.remove(msg.id);
-                      else _pinnedIds.add(msg.id);
+                      if (isPinned)
+                        _pinnedIds.remove(msg.id);
+                      else
+                        _pinnedIds.add(msg.id);
                     });
                     Navigator.pop(ctx);
                     _dismissOverlay();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(isPinned ? 'Message unpinned' : 'Message pinned 📌'),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isPinned ? 'Message unpinned' : 'Message pinned 📌',
+                        ),
+                        duration: const Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
                   },
                 ),
                 Divider(height: 1, color: divColor),
 
                 // ── Star / Unstar ──────────────────────────────
                 _SheetAction(
-                  icon: isStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                  icon: isStarred
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
                   label: isStarred ? 'Unstar' : 'Star',
                   color: isStarred ? const Color(0xFFFBBF24) : labelClr,
                   onTap: () {
                     setState(() {
-                      if (isStarred) _starredIds.remove(msg.id);
-                      else _starredIds.add(msg.id);
+                      if (isStarred)
+                        _starredIds.remove(msg.id);
+                      else
+                        _starredIds.add(msg.id);
                     });
                     Navigator.pop(ctx);
                     _dismissOverlay();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(
-                            isStarred ? Icons.star_outline_rounded : Icons.star_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(isStarred ? 'Removed from starred' : 'Message starred'),
-                        ],
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(
+                              isStarred
+                                  ? Icons.star_outline_rounded
+                                  : Icons.star_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isStarred
+                                  ? 'Removed from starred'
+                                  : 'Message starred',
+                            ),
+                          ],
+                        ),
+                        duration: const Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: _d
+                            ? const Color(0xFF2A2E3A)
+                            : const Color(0xFF4A4A4A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: _d ? const Color(0xFF2A2E3A) : const Color(0xFF4A4A4A),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ));
+                    );
                   },
                 ),
                 Divider(height: 1, color: divColor),
 
                 // ── Select ─────────────────────────────────────
                 _SheetAction(
-                  icon: isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                  icon: isSelected
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
                   label: isSelected ? 'Deselect' : 'Select',
                   color: isSelected ? AppColors.primary : labelClr,
                   onTap: () {
                     setState(() {
-                      if (isSelected) _selectedIds.remove(msg.id);
-                      else { _selectedIds.add(msg.id); _selectMode = true; }
+                      if (isSelected)
+                        _selectedIds.remove(msg.id);
+                      else {
+                        _selectedIds.add(msg.id);
+                        _selectMode = true;
+                      }
                     });
                     Navigator.pop(ctx);
                     _dismissOverlay();
@@ -526,11 +1014,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   label: 'Report',
                   color: !isMe ? AppColors.error : subClr,
                   enabled: !isMe,
-                  onTap: !isMe ? () {
-                    Navigator.pop(ctx);
-                    _dismissOverlay();
-                    _showReportSheet(msg);
-                  } : null,
+                  onTap: !isMe
+                      ? () {
+                          Navigator.pop(ctx);
+                          _dismissOverlay();
+                          _showReportSheet(msg);
+                        }
+                      : null,
                 ),
                 Divider(height: 1, color: divColor),
 
@@ -540,10 +1030,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   label: 'Delete',
                   color: isMe ? AppColors.error : subClr,
                   enabled: isMe,
-                  onTap: isMe ? () {
-                    Navigator.pop(ctx);
-                    _deleteMsg(msg);
-                  } : null,
+                  onTap: isMe
+                      ? () {
+                          Navigator.pop(ctx);
+                          _deleteMsg(msg);
+                        }
+                      : null,
                 ),
 
                 SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
@@ -565,8 +1057,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final myId = context.watch<AuthService>().currentUser?.id ?? '';
     final other = widget.chat.otherUser;
-    final swapDone = widget.chat.swapStatus == 'completed'
-        || widget.chat.swapStatus == 'cancelled';
+    final swapDone =
+        widget.chat.swapStatus == 'completed' ||
+        widget.chat.swapStatus == 'cancelled';
     final swapPending = widget.chat.swapStatus == 'pending';
 
     return GestureDetector(
@@ -575,7 +1068,6 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: _bg,
         body: Column(
           children: [
-
             // ── Gradient header ───────────────────────────────
             Container(
               decoration: const BoxDecoration(
@@ -593,18 +1085,24 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       // Back
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white, size: 19),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 19,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
 
                       // Avatar → profile
                       GestureDetector(
                         onTap: other?.id != null
-                            ? () => Navigator.push(context,
+                            ? () => Navigator.push(
+                                context,
                                 MaterialPageRoute(
-                                    builder: (_) => UserProfileScreen(
-                                        userId: other!.id)))
+                                  builder: (_) =>
+                                      UserProfileScreen(userId: other!.id),
+                                ),
+                              )
                             : null,
                         child: AvatarWidget(
                           avatarUrl: other?.avatarUrl,
@@ -618,10 +1116,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: other?.id != null
-                              ? () => Navigator.push(context,
+                              ? () => Navigator.push(
+                                  context,
                                   MaterialPageRoute(
-                                      builder: (_) =>
-                                          UserProfileScreen(userId: other!.id)))
+                                    builder: (_) =>
+                                        UserProfileScreen(userId: other!.id),
+                                  ),
+                                )
                               : null,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,48 +1141,132 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 '@${other?.username ?? ''}',
                                 style: GoogleFonts.dmSans(
-                                    color: Colors.white70, fontSize: 11),
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
 
-                      // Swap action — text only, white
-                      if (!swapDone && !swapPending)
-                        GestureDetector(
-                          onTap: _confirmSwap,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.handshake_outlined,
-                                  color: Colors.white, size: 16),
-                              const SizedBox(width: 5),
-                              Text('Confirm Swap',
-                                  style: GoogleFonts.dmSans(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
-                            ],
+                      // ── Schedule button (always visible) ─────────────
+                      GestureDetector(
+                        onTap: _showScheduleSheet,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
                           ),
-                        )
-                      else if (swapPending)
-                        GestureDetector(
-                          onTap: _completeSwap,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.35),
+                              width: 1,
+                            ),
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.check_circle_outline_rounded,
-                                  color: Colors.white, size: 16),
+                              const Text('📅', style: TextStyle(fontSize: 13)),
                               const SizedBox(width: 5),
-                              Text('Complete',
-                                  style: GoogleFonts.dmSans(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                'Schedule',
+                                style: GoogleFonts.dmSans(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ],
                           ),
                         ),
+                      ),
+                      // ── Confirm Swap (separate) ─────────────────────────
+                      if (!swapDone && !swapPending) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _confirmSwap,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.handshake_outlined,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Confirm Swap',
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else if (swapPending) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _completeSwap,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Complete',
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -695,7 +1280,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (cs.isLoadingMessages && cs.messages.isEmpty) {
                     return Center(
                       child: CircularProgressIndicator(
-                          color: AppColors.primary, strokeWidth: 2),
+                        color: AppColors.primary,
+                        strokeWidth: 2,
+                      ),
                     );
                   }
                   if (cs.messages.isEmpty) return _emptyChat();
@@ -705,29 +1292,49 @@ class _ChatScreenState extends State<ChatScreen> {
                       // ── Pinned message banner ────────────────
                       if (_pinnedIds.isNotEmpty)
                         Positioned(
-                          top: 0, left: 0, right: 0,
+                          top: 0,
+                          left: 0,
+                          right: 0,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withOpacity(0.12),
-                              border: Border(bottom: BorderSide(
-                                color: AppColors.primary.withOpacity(0.25), width: 1)),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: AppColors.primary.withOpacity(0.25),
+                                  width: 1,
+                                ),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.push_pin_rounded,
-                                    size: 14, color: AppColors.primary),
+                                const Icon(
+                                  Icons.push_pin_rounded,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
                                 const SizedBox(width: 6),
-                                Expanded(child: Text(
-                                  '${_pinnedIds.length} pinned message${_pinnedIds.length > 1 ? "s" : ""}',
-                                  style: GoogleFonts.dmSans(
-                                    color: AppColors.primary, fontSize: 12,
-                                    fontWeight: FontWeight.w600),
-                                )),
+                                Expanded(
+                                  child: Text(
+                                    '${_pinnedIds.length} pinned message${_pinnedIds.length > 1 ? "s" : ""}',
+                                    style: GoogleFonts.dmSans(
+                                      color: AppColors.primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                                 GestureDetector(
-                                  onTap: () => setState(() => _pinnedIds.clear()),
-                                  child: const Icon(Icons.close_rounded,
-                                      size: 16, color: AppColors.primary),
+                                  onTap: () =>
+                                      setState(() => _pinnedIds.clear()),
+                                  child: const Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -736,7 +1343,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
                       ListView.builder(
                         controller: _scrollCtrl,
-                        padding: EdgeInsets.fromLTRB(12, _pinnedIds.isNotEmpty ? 44 : 12, 12, 8),
+                        padding: EdgeInsets.fromLTRB(
+                          12,
+                          _pinnedIds.isNotEmpty ? 44 : 12,
+                          12,
+                          8,
+                        ),
                         physics: const BouncingScrollPhysics(),
                         itemCount: cs.messages.length,
                         itemBuilder: (_, i) {
@@ -745,9 +1357,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           if (msg.messageType == 'system') {
                             return _sysMsg(msg.content ?? '');
                           }
-                          final isPinned  = _pinnedIds.contains(msg.id);
+                          final isPinned = _pinnedIds.contains(msg.id);
                           final isStarred = _starredIds.contains(msg.id);
-                          final isSel     = _selectedIds.contains(msg.id);
+                          final isSel = _selectedIds.contains(msg.id);
 
                           return _SwipeToReply(
                             key: ValueKey(msg.id),
@@ -761,23 +1373,32 @@ class _ChatScreenState extends State<ChatScreen> {
                               isStarred: isStarred,
                               isSelected: isSel,
                               selectMode: _selectMode,
-                              longPressDuration: const Duration(milliseconds: 350),
+                              longPressDuration: const Duration(
+                                milliseconds: 350,
+                              ),
                               onLongPress: () => _onLongPress(msg),
                               onTap: _selectMode
                                   ? () => setState(() {
-                                      if (isSel) _selectedIds.remove(msg.id);
-                                      else _selectedIds.add(msg.id);
+                                      if (isSel)
+                                        _selectedIds.remove(msg.id);
+                                      else
+                                        _selectedIds.add(msg.id);
                                     })
                                   : null,
                               onMenuTap: () => _onLongPress(msg),
-                              bubble: _Bubble(
-                                msg: msg,
-                                isMe: isMe,
-                                outGrad: _outGrad,
-                                inBg: _inBg,
-                                inText: _inText,
-                                tl: _tl,
-                              ).animate().fadeIn(delay: Duration(milliseconds: i * 18)),
+                              bubbleBuilder: (showMenu) =>
+                                  _Bubble(
+                                    msg: msg,
+                                    isMe: isMe,
+                                    outGrad: _outGrad,
+                                    inBg: _inBg,
+                                    inText: _inText,
+                                    tl: _tl,
+                                    showMenuIcon: showMenu,
+                                    onMenuTap: () => _onLongPress(msg),
+                                  ).animate().fadeIn(
+                                    delay: Duration(milliseconds: i * 18),
+                                  ),
                             ),
                           );
                         },
@@ -786,38 +1407,88 @@ class _ChatScreenState extends State<ChatScreen> {
                       // select-mode top bar
                       if (_selectMode)
                         Positioned(
-                          bottom: 0, left: 0, right: 0,
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
                             color: _sf,
                             child: Row(
                               children: [
-                                Text('${_selectedIds.length} selected',
-                                  style: GoogleFonts.dmSans(color: _tp, fontWeight: FontWeight.w700)),
+                                Text(
+                                  '${_selectedIds.length} selected',
+                                  style: GoogleFonts.dmSans(
+                                    color: _tp,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                                 const Spacer(),
                                 TextButton.icon(
-                                  icon: Icon(Icons.shortcut_rounded, color: AppColors.primary),
-                                  label: Text('Forward', style: GoogleFonts.dmSans(color: AppColors.primary)),
-                                  onPressed: _selectedIds.isEmpty ? null : () {
-                                    final msgs = cs.messages.where((m) => _selectedIds.contains(m.id)).toList();
-                                    setState(() { _selectedIds.clear(); _selectMode = false; });
-                                    if (msgs.isNotEmpty) _showForwardSheet(msgs.first);
-                                  },
+                                  icon: Icon(
+                                    Icons.shortcut_rounded,
+                                    color: AppColors.primary,
+                                  ),
+                                  label: Text(
+                                    'Forward',
+                                    style: GoogleFonts.dmSans(
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  onPressed: _selectedIds.isEmpty
+                                      ? null
+                                      : () {
+                                          final msgs = cs.messages
+                                              .where(
+                                                (m) =>
+                                                    _selectedIds.contains(m.id),
+                                              )
+                                              .toList();
+                                          setState(() {
+                                            _selectedIds.clear();
+                                            _selectMode = false;
+                                          });
+                                          if (msgs.isNotEmpty)
+                                            _showForwardSheet(msgs.first);
+                                        },
                                 ),
                                 TextButton.icon(
-                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                                  label: Text('Delete', style: GoogleFonts.dmSans(color: Colors.red)),
-                                  onPressed: _selectedIds.isEmpty ? null : () async {
-                                    for (final id in _selectedIds) {
-                                      await context.read<ChatService>().deleteMessage(id, widget.chat.id);
-                                    }
-                                    setState(() { _selectedIds.clear(); _selectMode = false; });
-                                  },
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.red,
+                                  ),
+                                  label: Text(
+                                    'Delete',
+                                    style: GoogleFonts.dmSans(
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  onPressed: _selectedIds.isEmpty
+                                      ? null
+                                      : () async {
+                                          for (final id in _selectedIds) {
+                                            await context
+                                                .read<ChatService>()
+                                                .deleteMessage(
+                                                  id,
+                                                  widget.chat.id,
+                                                );
+                                          }
+                                          setState(() {
+                                            _selectedIds.clear();
+                                            _selectMode = false;
+                                          });
+                                        },
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.close_rounded),
                                   color: _tp,
-                                  onPressed: () => setState(() { _selectedIds.clear(); _selectMode = false; }),
+                                  onPressed: () => setState(() {
+                                    _selectedIds.clear();
+                                    _selectMode = false;
+                                  }),
                                 ),
                               ],
                             ),
@@ -836,7 +1507,12 @@ class _ChatScreenState extends State<ChatScreen> {
               isRecording: _isRecording,
               recordDuration: _recordDuration,
               replyTarget: _replyTarget,
-              d: _d, sf: _sf, sv: _sv, bd: _bd, tp: _tp, ts: _ts,
+              d: _d,
+              sf: _sf,
+              sv: _sv,
+              bd: _bd,
+              tp: _tp,
+              ts: _ts,
               onCancelReply: () => setState(() => _replyTarget = null),
               onSend: _send,
               onPickImage: _pickImage,
@@ -853,25 +1529,151 @@ class _ChatScreenState extends State<ChatScreen> {
   // ── Full emoji picker ─────────────────────────────────────────────────────
   void _showFullEmojiPicker(MessageModel msg) {
     final bool d = Theme.of(context).brightness == Brightness.dark;
-    final menuBg  = d ? const Color(0xFF1C1F2B) : Colors.white;
+    final menuBg = d ? const Color(0xFF1C1F2B) : Colors.white;
     final divColor = d ? const Color(0xFF2A2E3A) : const Color(0xFFEEEEEE);
     final labelClr = d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
 
     const allEmojis = [
-      '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊',
-      '😋','😎','😍','🥰','😘','🤩','😇','🙂','😏','😒',
-      '😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩',
-      '🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵',
-      '😱','😨','😰','😥','🤗','🤔','🤭','🤫','🤥','😶',
-      '😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴',
-      '🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒',
-      '👍','👎','👋','🤚','✋','🖐','👌','🤌','🤏','✌️',
-      '🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝️','👍',
-      '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💕',
-      '💞','💓','💗','💖','💘','💝','💟','☮️','✝️','🕊️',
-      '🎉','🎊','🎈','🎁','🎀','🏆','🥇','🌟','⭐','✨',
-      '🔥','💫','🌈','🌸','🌺','🌻','🍀','🌙','⚡','❄️',
-      '🙏','👏','🤝','💪','🦾','🫶','💅','🫠','🥹','😌',
+      '😀',
+      '😁',
+      '😂',
+      '🤣',
+      '😃',
+      '😄',
+      '😅',
+      '😆',
+      '😉',
+      '😊',
+      '😋',
+      '😎',
+      '😍',
+      '🥰',
+      '😘',
+      '🤩',
+      '😇',
+      '🙂',
+      '😏',
+      '😒',
+      '😞',
+      '😔',
+      '😟',
+      '😕',
+      '🙁',
+      '☹️',
+      '😣',
+      '😖',
+      '😫',
+      '😩',
+      '🥺',
+      '😢',
+      '😭',
+      '😤',
+      '😠',
+      '😡',
+      '🤬',
+      '🤯',
+      '😳',
+      '🥵',
+      '😱',
+      '😨',
+      '😰',
+      '😥',
+      '🤗',
+      '🤔',
+      '🤭',
+      '🤫',
+      '🤥',
+      '😶',
+      '😑',
+      '😬',
+      '🙄',
+      '😯',
+      '😦',
+      '😧',
+      '😮',
+      '😲',
+      '🥱',
+      '😴',
+      '🤤',
+      '😪',
+      '😵',
+      '🤐',
+      '🥴',
+      '🤢',
+      '🤮',
+      '🤧',
+      '😷',
+      '🤒',
+      '👍',
+      '👎',
+      '👋',
+      '🤚',
+      '✋',
+      '🖐',
+      '👌',
+      '🤌',
+      '🤏',
+      '✌️',
+      '🤞',
+      '🤟',
+      '🤘',
+      '🤙',
+      '👈',
+      '👉',
+      '👆',
+      '👇',
+      '☝️',
+      '👍',
+      '❤️',
+      '🧡',
+      '💛',
+      '💚',
+      '💙',
+      '💜',
+      '🖤',
+      '🤍',
+      '🤎',
+      '💕',
+      '💞',
+      '💓',
+      '💗',
+      '💖',
+      '💘',
+      '💝',
+      '💟',
+      '☮️',
+      '✝️',
+      '🕊️',
+      '🎉',
+      '🎊',
+      '🎈',
+      '🎁',
+      '🎀',
+      '🏆',
+      '🥇',
+      '🌟',
+      '⭐',
+      '✨',
+      '🔥',
+      '💫',
+      '🌈',
+      '🌸',
+      '🌺',
+      '🌻',
+      '🍀',
+      '🌙',
+      '⚡',
+      '❄️',
+      '🙏',
+      '👏',
+      '🤝',
+      '💪',
+      '🦾',
+      '🫶',
+      '💅',
+      '🫠',
+      '🥹',
+      '😌',
     ];
 
     showModalBottomSheet(
@@ -889,7 +1691,8 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             // drag handle
             Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               margin: const EdgeInsets.only(top: 10, bottom: 8),
               decoration: BoxDecoration(
                 color: divColor,
@@ -900,12 +1703,14 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: Row(
                 children: [
-                  Text('React to message',
+                  Text(
+                    'React to message',
                     style: GoogleFonts.dmSans(
                       color: labelClr,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                    )),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -967,54 +1772,71 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Forward to',
-                style: GoogleFonts.dmSans(
-                    color: _tp, fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              'Forward to',
+              style: GoogleFonts.dmSans(
+                color: _tp,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 12),
             if (cs.chats.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text('No other conversations',
-                    style: GoogleFonts.dmSans(color: _ts)),
+                child: Text(
+                  'No other conversations',
+                  style: GoogleFonts.dmSans(color: _ts),
+                ),
               )
             else
               ...cs.chats
                   .where((c) => c.id != widget.chat.id)
                   .take(6)
-                  .map((c) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: AvatarWidget(
-                          avatarUrl: c.otherUser?.avatarUrl,
-                          username: c.otherUser?.username ?? '',
-                          radius: 20,
+                  .map(
+                    (c) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: AvatarWidget(
+                        avatarUrl: c.otherUser?.avatarUrl,
+                        username: c.otherUser?.username ?? '',
+                        radius: 20,
+                      ),
+                      title: Text(
+                        c.otherUser?.fullName ??
+                            c.otherUser?.username ??
+                            'User',
+                        style: GoogleFonts.dmSans(
+                          color: _tp,
+                          fontWeight: FontWeight.w600,
                         ),
-                        title: Text(
-                          c.otherUser?.fullName ?? c.otherUser?.username ?? 'User',
-                          style: GoogleFonts.dmSans(
-                              color: _tp, fontWeight: FontWeight.w600),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          // Forward inline using sendMessage (no forwardMessage needed)
-                          final fwdContent = msg.content != null
-                              ? '↪ ${msg.content}'
-                              : null;
-                          context.read<ChatService>().sendMessage(
-                            chatId: c.id,
-                            content: fwdContent,
-                            imageUrl: msg.imageUrl,
-                            messageType: msg.messageType,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        // Forward inline using sendMessage (no forwardMessage needed)
+                        final fwdContent = msg.content != null
+                            ? '↪ ${msg.content}'
+                            : null;
+                        context.read<ChatService>().sendMessage(
+                          chatId: c.id,
+                          content: fwdContent,
+                          imageUrl: msg.imageUrl,
+                          messageType: msg.messageType,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
                             content: Text(
-                                'Forwarded to ${c.otherUser?.fullName ?? 'User'}'),
+                              'Forwarded to ${c.otherUser?.fullName ?? 'User'}',
+                            ),
                             backgroundColor: AppColors.primary,
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ));
-                        },
-                      )),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ],
         ),
       ),
@@ -1044,73 +1866,99 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Report message',
-                style: GoogleFonts.dmSans(
-                    color: _tp, fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              'Report message',
+              style: GoogleFonts.dmSans(
+                color: _tp,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text('Select a reason',
-                style: GoogleFonts.dmSans(color: _ts, fontSize: 13)),
+            Text(
+              'Select a reason',
+              style: GoogleFonts.dmSans(color: _ts, fontSize: 13),
+            ),
             const SizedBox(height: 12),
-            ...reasons.map((r) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.flag_outlined,
-                      color: AppColors.error, size: 20),
-                  title: Text(r,
-                      style: GoogleFonts.dmSans(
-                          color: _tp, fontWeight: FontWeight.w500)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            ...reasons.map(
+              (r) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  Icons.flag_outlined,
+                  color: AppColors.error,
+                  size: 20,
+                ),
+                title: Text(
+                  r,
+                  style: GoogleFonts.dmSans(
+                    color: _tp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
                         content: const Text('Message reported. Thank you.'),
                         backgroundColor: AppColors.success,
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ));
-                    }
-                  },
-                )),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-
   Widget _sysMsg(String content) => Center(
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.success.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(content,
-              style: GoogleFonts.dmSans(
-                  fontSize: 11.5,
-                  color: AppColors.success,
-                  fontWeight: FontWeight.w600)),
+    child: Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.success.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        content,
+        style: GoogleFonts.dmSans(
+          fontSize: 11.5,
+          color: AppColors.success,
+          fontWeight: FontWeight.w600,
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _emptyChat() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.waving_hand_rounded, size: 40, color: _ts),
-            const SizedBox(height: 12),
-            Text('Say hello!',
-                style: GoogleFonts.dmSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _tp)),
-            const SizedBox(height: 4),
-            Text('Start your SkillSwap conversation',
-                style: GoogleFonts.dmSans(color: _ts, fontSize: 13)),
-          ],
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.waving_hand_rounded, size: 40, color: _ts),
+        const SizedBox(height: 12),
+        Text(
+          'Say hello!',
+          style: GoogleFonts.dmSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _tp,
+          ),
         ),
-      );
+        const SizedBox(height: 4),
+        Text(
+          'Start your SkillSwap conversation',
+          style: GoogleFonts.dmSans(color: _ts, fontSize: 13),
+        ),
+      ],
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1148,11 +1996,14 @@ class _HeaderBtn extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 15),
             const SizedBox(width: 5),
-            Text(label,
-                style: GoogleFonts.dmSans(
-                    color: color,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                color: color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),
@@ -1171,7 +2022,8 @@ class _MsgRow extends StatefulWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onTap;
   final VoidCallback onMenuTap;
-  final Widget bubble;
+  // bubble builder accepts showMenu so the interior icon fades in/out
+  final Widget Function(bool showMenu) bubbleBuilder;
 
   const _MsgRow({
     required this.msg,
@@ -1185,7 +2037,7 @@ class _MsgRow extends StatefulWidget {
     required this.onLongPress,
     required this.onTap,
     required this.onMenuTap,
-    required this.bubble,
+    required this.bubbleBuilder,
   });
 
   @override
@@ -1194,29 +2046,39 @@ class _MsgRow extends StatefulWidget {
 
 class _MsgRowState extends State<_MsgRow> {
   bool _hovered = false;
-  bool _tapped  = false;
+  bool _longPressed = false;
 
   void _handleTap() {
-    // Toggle pull-bar on tap (mobile WhatsApp style)
-    setState(() => _tapped = !_tapped);
     widget.onTap?.call();
+  }
+
+  void _handleLongPress() {
+    setState(() => _longPressed = true);
+    widget.onLongPress();
+    // auto-hide icon after sheet dismisses (1.5 s fallback)
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _longPressed = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final showPullBar = _hovered || _tapped;
+    final showMenu = _hovered || _longPressed;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() { _hovered = false; _tapped = false; }),
+      onExit: (_) => setState(() {
+        _hovered = false;
+      }),
       child: GestureDetector(
         onTap: _handleTap,
-        onLongPress: widget.onLongPress,
+        onLongPress: _handleLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           decoration: (widget.isHighlighted || widget.isSelected)
               ? BoxDecoration(
                   color: AppColors.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12))
+                  borderRadius: BorderRadius.circular(12),
+                )
               : null,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -1233,21 +2095,22 @@ class _MsgRowState extends State<_MsgRow> {
                       onChanged: (_) => widget.onTap?.call(),
                       activeColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
                 ),
 
-              // ── Bubble + badges ────────────────────────────
+              // ── Bubble (built with current showMenu state) ─
               Expanded(
                 child: Stack(
                   children: [
-                    widget.bubble,
+                    widget.bubbleBuilder(showMenu),
                     // Starred badge
                     if (widget.isStarred)
                       Positioned(
                         right: widget.isMe ? 16 : null,
-                        left:  widget.isMe ? null : 16,
+                        left: widget.isMe ? null : 16,
                         bottom: 22,
                         child: const Text("⭐", style: TextStyle(fontSize: 12)),
                       ),
@@ -1255,31 +2118,15 @@ class _MsgRowState extends State<_MsgRow> {
                     if (widget.isPinned)
                       Positioned(
                         right: widget.isMe ? 16 : null,
-                        left:  widget.isMe ? null : 16,
+                        left: widget.isMe ? null : 16,
                         bottom: 22,
-                        child: const Icon(Icons.push_pin_rounded,
-                            size: 12, color: AppColors.primary),
+                        child: const Icon(
+                          Icons.push_pin_rounded,
+                          size: 12,
+                          color: AppColors.primary,
+                        ),
                       ),
                   ],
-                ),
-              ),
-
-              // ── Pull-bar (visible only on hover/tap, WhatsApp-style) ───
-              AnimatedOpacity(
-                opacity: showPullBar ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 150),
-                child: GestureDetector(
-                  onTap: widget.onMenuTap,
-                  child: Container(
-                    width: 24, height: 24,
-                    margin: const EdgeInsets.only(right: 2, left: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.10),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.expand_more_rounded,
-                        size: 15, color: AppColors.primary),
-                  ),
                 ),
               ),
             ],
@@ -1297,11 +2144,12 @@ class _SwipeToReply extends StatefulWidget {
   final bool isMe;
   final VoidCallback onSwipe;
   final Widget child;
-  const _SwipeToReply(
-      {super.key,
-      required this.isMe,
-      required this.onSwipe,
-      required this.child});
+  const _SwipeToReply({
+    super.key,
+    required this.isMe,
+    required this.onSwipe,
+    required this.child,
+  });
 
   @override
   State<_SwipeToReply> createState() => _SwipeToReplyState();
@@ -1330,12 +2178,17 @@ class _SwipeToReplyState extends State<_SwipeToReply> {
             widget.child,
             if (_dx > 8)
               Positioned(
-                left: 0, top: 0, bottom: 0,
+                left: 0,
+                top: 0,
+                bottom: 0,
                 child: Opacity(
                   opacity: (_dx / 60).clamp(0, 1),
                   child: const Center(
-                    child: Icon(Icons.reply_rounded,
-                        color: AppColors.primary, size: 20),
+                    child: Icon(
+                      Icons.reply_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -1354,6 +2207,8 @@ class _Bubble extends StatelessWidget {
   final bool isMe;
   final LinearGradient outGrad;
   final Color inBg, inText, tl;
+  final VoidCallback? onMenuTap;
+  final bool showMenuIcon;
 
   const _Bubble({
     required this.msg,
@@ -1362,6 +2217,8 @@ class _Bubble extends StatelessWidget {
     required this.inBg,
     required this.inText,
     required this.tl,
+    this.onMenuTap,
+    this.showMenuIcon = false,
   });
 
   @override
@@ -1375,114 +2232,273 @@ class _Bubble extends StatelessWidget {
 
     // Voice note bubble
     final isVoice = msg.messageType == 'voice';
+    final hasReaction = msg.reaction != null && msg.reaction!.isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.only(
-        left:  isMe ? 60 : 8,
+        left: isMe ? 60 : 8,
         right: isMe ? 8 : 60,
-        bottom: 6,
+        bottom: hasReaction ? 14 : 6,
       ),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: (msg.messageType == 'image')
-                ? EdgeInsets.zero
-                : isVoice
-                    ? const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10)
-                    : const EdgeInsets.symmetric(
-                        horizontal: 13, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: isMe ? outGrad : null,
-              color: isMe ? null : inBg,
-              borderRadius: radius,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isMe ? 0.12 : 0.05),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: isVoice
-                ? _VoiceNoteBubble(isMe: isMe, inText: inText)
-                : msg.messageType == 'image' && msg.imageUrl != null
-                    ? ClipRRect(
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // ── Bubble container with interior menu icon overlay ──
+                Stack(
+                  children: [
+                    Container(
+                      padding: (msg.messageType == 'image')
+                          ? EdgeInsets.zero
+                          : isVoice
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            )
+                          : const EdgeInsets.symmetric(
+                              horizontal: 13,
+                              vertical: 10,
+                            ),
+                      decoration: BoxDecoration(
+                        gradient: isMe ? outGrad : null,
+                        color: isMe ? null : inBg,
                         borderRadius: radius,
-                        child: Image.network(msg.imageUrl!,
-                            width: 200, fit: BoxFit.cover),
-                      )
-                    : Text(
-                        msg.content ?? '',
-                        style: GoogleFonts.dmSans(
-                          color: isMe ? Colors.white : inText,
-                          fontSize: 14,
-                          height: 1.45,
-                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isMe ? 0.12 : 0.05),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-          ),
-          // ── Reaction badge (WhatsApp-style) ─────────────────
-          if (msg.reaction != null && msg.reaction!.isNotEmpty)
-            Transform.translate(
-              offset: Offset(isMe ? -8 : 8, -6),
-              child: Align(
-                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                child: GestureDetector(
-                  onTap: () {
-                    // Tapping the reaction badge removes it (toggle off)
-                    context.read<ChatService>().reactToMessage(msg.id, null);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: inBg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.black.withOpacity(0.08),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.10),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
+                      child: isVoice
+                          ? _VoiceNoteBubble(isMe: isMe, inText: inText)
+                          : msg.messageType == 'image' && msg.imageUrl != null
+                          ? ClipRRect(
+                              borderRadius: radius,
+                              child: Image.network(
+                                msg.imageUrl!,
+                                width: 200,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Padding(
+                              // extra right padding so text never overlaps menu icon
+                              padding: const EdgeInsets.only(right: 18),
+                              child: Text(
+                                msg.content ?? '',
+                                style: GoogleFonts.dmSans(
+                                  color: isMe ? Colors.white : inText,
+                                  fontSize: 14,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ),
                     ),
-                    child: Text(
-                      msg.reaction!,
-                      style: const TextStyle(fontSize: 14),
+                    // ── Interior menu chevron — fades in on hover/long-press ──
+                    if (onMenuTap != null)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: AnimatedOpacity(
+                          opacity: showMenuIcon ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeInOut,
+                          child: IgnorePointer(
+                            ignoring: !showMenuIcon,
+                            child: GestureDetector(
+                              onTap: onMenuTap,
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: isMe
+                                      ? Colors.white.withOpacity(0.22)
+                                      : Colors.black.withOpacity(0.14),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.15),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.expand_more_rounded,
+                                  size: 15,
+                                  color: isMe
+                                      ? Colors.white.withOpacity(0.90)
+                                      : inText.withOpacity(0.65),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                // ── Reaction emoji — floating at bottom-right corner ──
+                if (hasReaction)
+                  Positioned(
+                    bottom: -10,
+                    right: isMe ? 6 : null,
+                    left: isMe ? null : 6,
+                    child: GestureDetector(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          barrierColor: Colors.black.withOpacity(0.55),
+                          builder: (_) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1C1F2B),
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.35),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    msg.reaction!,
+                                    style: const TextStyle(fontSize: 40),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF2A2E3A),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            isMe ? 'Y' : 'T',
+                                            style: GoogleFonts.dmSans(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          isMe ? 'You' : 'Them',
+                                          style: GoogleFonts.dmSans(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          context
+                                              .read<ChatService>()
+                                              .reactToMessage(msg.id, null);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.red.withOpacity(
+                                                0.4,
+                                              ),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Click to remove',
+                                            style: GoogleFonts.dmSans(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF262D3D),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.15),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.18),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          msg.reaction!,
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 3),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                timeago.format(msg.createdAt),
-                style:
-                    GoogleFonts.dmSans(fontSize: 10, color: tl),
-              ),
-              if (isMe) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  msg.isRead
-                      ? Icons.done_all_rounded
-                      : Icons.done_rounded,
-                  size: 13,
-                  color: msg.isRead ? AppColors.primary : tl,
-                ),
               ],
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 3),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  timeago.format(msg.createdAt),
+                  style: GoogleFonts.dmSans(fontSize: 10, color: tl),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    msg.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                    size: 13,
+                    color: msg.isRead ? AppColors.primary : tl,
+                  ),
+                ],
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1508,14 +2524,19 @@ class _VoiceNoteBubble extends StatelessWidget {
         CustomPaint(
           size: const Size(90, 24),
           painter: _WaveformPainter(
-              color: iconColor.withOpacity(0.7), bars: 18),
+            color: iconColor.withOpacity(0.7),
+            bars: 18,
+          ),
         ),
         const SizedBox(width: 8),
-        Text('0:12',
-            style: GoogleFonts.dmSans(
-                color: iconColor.withOpacity(0.7),
-                fontSize: 11,
-                fontWeight: FontWeight.w600)),
+        Text(
+          '0:12',
+          style: GoogleFonts.dmSans(
+            color: iconColor.withOpacity(0.7),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -1577,14 +2598,14 @@ class _InputBarState extends State<_InputBar>
 
   @override
   Widget build(BuildContext context) {
-    final d  = widget.d;
+    final d = widget.d;
     final ts = widget.ts;
 
     // Exact colours from screenshot
-    const barBg    = Color(0xFF12151E); // near-black navy strip
-    const iconClr  = Color(0xFF6C5FD9); // purple for image icon
-    const hintClr  = Color(0xFF4A4D5A); // dim hint text
-    const sendClr  = Color(0xFF6C5FD9); // solid purple circle
+    const barBg = Color(0xFF12151E); // near-black navy strip
+    const iconClr = Color(0xFF6C5FD9); // purple for image icon
+    const hintClr = Color(0xFF4A4D5A); // dim hint text
+    const sendClr = Color(0xFF6C5FD9); // solid purple circle
 
     return Container(
       color: barBg,
@@ -1593,7 +2614,6 @@ class _InputBarState extends State<_InputBar>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-
             // ── Reply preview (unchanged) ─────────────────────
             if (widget.replyTarget != null)
               Container(
@@ -1604,12 +2624,16 @@ class _InputBarState extends State<_InputBar>
                   color: AppColors.primary.withOpacity(0.07),
                   borderRadius: BorderRadius.circular(10),
                   border: const Border(
-                      left: BorderSide(color: AppColors.primary, width: 3)),
+                    left: BorderSide(color: AppColors.primary, width: 3),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.reply_rounded,
-                        size: 15, color: AppColors.primary),
+                    const Icon(
+                      Icons.reply_rounded,
+                      size: 15,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 7),
                     Expanded(
                       child: Text(
@@ -1617,12 +2641,13 @@ class _InputBarState extends State<_InputBar>
                             (widget.replyTarget!.messageType == 'image'
                                 ? '📷 Photo'
                                 : widget.replyTarget!.messageType == 'voice'
-                                    ? '🎤 Voice note'
-                                    : ''),
+                                ? '🎤 Voice note'
+                                : ''),
                         style: GoogleFonts.dmSans(
-                            color: ts,
-                            fontSize: 12.5,
-                            fontStyle: FontStyle.italic),
+                          color: ts,
+                          fontSize: 12.5,
+                          fontStyle: FontStyle.italic,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1641,7 +2666,6 @@ class _InputBarState extends State<_InputBar>
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-
                   // ── Gradient rectangle input container ────
                   Expanded(
                     child: Container(
@@ -1663,8 +2687,11 @@ class _InputBarState extends State<_InputBar>
                               onTap: widget.onPickImage,
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(Icons.image_outlined,
-                                    color: iconClr, size: 20),
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  color: iconClr,
+                                  size: 20,
+                                ),
                               ),
                             ),
 
@@ -1682,19 +2709,26 @@ class _InputBarState extends State<_InputBar>
                                     textCapitalization:
                                         TextCapitalization.sentences,
                                     style: GoogleFonts.dmSans(
-                                        color: d
-                                            ? Colors.white
-                                            : const Color(0xFF0A0A0A),
-                                        fontSize: 14),
+                                      color: d
+                                          ? Colors.white
+                                          : const Color(0xFF0A0A0A),
+                                      fontSize: 14,
+                                    ),
                                     decoration: InputDecoration(
                                       hintText: 'Type a message...',
                                       hintStyle: GoogleFonts.dmSans(
-                                          color: hintClr, fontSize: 14),
+                                        color: hintClr,
+                                        fontSize: 14,
+                                      ),
                                       border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      filled: false,
                                       isDense: true,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                              vertical: 11),
+                                            vertical: 11,
+                                          ),
                                     ),
                                     onSubmitted: (_) => widget.onSend(),
                                   ),
@@ -1706,8 +2740,11 @@ class _InputBarState extends State<_InputBar>
                               onTap: widget.onStartRecord,
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(Icons.mic_rounded,
-                                    color: hintClr, size: 20),
+                                child: Icon(
+                                  Icons.mic_rounded,
+                                  color: hintClr,
+                                  size: 20,
+                                ),
                               ),
                             )
                           else ...[
@@ -1716,8 +2753,11 @@ class _InputBarState extends State<_InputBar>
                               onTap: widget.onStopRecord,
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(Icons.stop_rounded,
-                                    color: Colors.red, size: 20),
+                                child: Icon(
+                                  Icons.stop_rounded,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
                               ),
                             ),
                           ],
@@ -1728,33 +2768,52 @@ class _InputBarState extends State<_InputBar>
 
                   const SizedBox(width: 8),
 
-                  // ── Send circle — outside the rectangle ───
+                  // ── Send rounded-square — outside the rectangle ───
                   GestureDetector(
                     onTap: widget.isSending
                         ? null
                         : widget.isRecording
-                            ? widget.onStopRecord
-                            : widget.onSend,
+                        ? widget.onStopRecord
+                        : widget.onSend,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: 40, height: 40,
-                      decoration: const BoxDecoration(
-                        color: sendClr,
-                        shape: BoxShape.circle,
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF7B5EFF), Color(0xFF5B3FE8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6C5FD9).withOpacity(0.45),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: widget.isSending
                           ? const Center(
                               child: SizedBox(
-                                  width: 16, height: 16,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white)))
-                          : Icon(
-                              widget.isRecording
-                                  ? Icons.check_rounded
-                                  : Icons.send_rounded,
-                              color: Colors.white,
-                              size: 17,
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          : Transform.rotate(
+                              angle: 0,
+                              child: Icon(
+                                widget.isRecording
+                                    ? Icons.check_rounded
+                                    : Icons.send_rounded,
+                                color: Colors.white,
+                                size: 19,
+                              ),
                             ),
                     ),
                   ),
@@ -1790,27 +2849,33 @@ class _RecordingIndicator extends StatelessWidget {
         AnimatedBuilder(
           animation: pulseCtrl,
           builder: (_, __) => Container(
-            width: 10, height: 10,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
-              color: Colors.red
-                  .withOpacity(0.4 + 0.6 * pulseCtrl.value),
+              color: Colors.red.withOpacity(0.4 + 0.6 * pulseCtrl.value),
               shape: BoxShape.circle,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        Text(duration,
-            style: GoogleFonts.dmSans(
-                color: Colors.red,
-                fontSize: 14,
-                fontWeight: FontWeight.w600)),
+        Text(
+          duration,
+          style: GoogleFonts.dmSans(
+            color: Colors.red,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(width: 8),
         // Mini waveform animation
         AnimatedBuilder(
           animation: pulseCtrl,
           builder: (_, __) => Row(
             children: List.generate(6, (i) {
-              final h = 4.0 + 10.0 * ((math.sin(pulseCtrl.value * math.pi * 2 + i) + 1) / 2);
+              final h =
+                  4.0 +
+                  10.0 *
+                      ((math.sin(pulseCtrl.value * math.pi * 2 + i) + 1) / 2);
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 1.5),
                 width: 3,
@@ -1831,9 +2896,10 @@ class _RecordingIndicator extends StatelessWidget {
             children: [
               const Icon(Icons.close_rounded, color: Colors.red, size: 16),
               const SizedBox(width: 2),
-              Text('Cancel',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.red, fontSize: 12)),
+              Text(
+                'Cancel',
+                style: GoogleFonts.dmSans(color: Colors.red, fontSize: 12),
+              ),
             ],
           ),
         ),
@@ -1896,11 +2962,12 @@ class _CtxAction extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback? onTap;
-  const _CtxAction(
-      {required this.icon,
-      required this.label,
-      required this.color,
-      this.onTap});
+  const _CtxAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1909,17 +2976,19 @@ class _CtxAction extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               Icon(icon, size: 18, color: color),
               const SizedBox(width: 10),
-              Text(label,
-                  style: GoogleFonts.dmSans(
-                      color: color,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  color: color,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -1937,8 +3006,24 @@ class _WaveformPainter extends CustomPainter {
   const _WaveformPainter({required this.color, this.bars = 7});
 
   static const _heights = [
-    3.0, 6.0, 10.0, 7.0, 4.0, 9.0, 5.0, 8.0, 11.0, 5.0,
-    7.0, 4.0, 10.0, 6.0, 3.0, 8.0, 5.0, 9.0,
+    3.0,
+    6.0,
+    10.0,
+    7.0,
+    4.0,
+    9.0,
+    5.0,
+    8.0,
+    11.0,
+    5.0,
+    7.0,
+    4.0,
+    10.0,
+    6.0,
+    3.0,
+    8.0,
+    5.0,
+    9.0,
   ];
 
   @override
@@ -1949,8 +3034,8 @@ class _WaveformPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    final midY    = size.height / 2;
-    final count   = math.min(bars, _heights.length);
+    final midY = size.height / 2;
+    final count = math.min(bars, _heights.length);
     final spacing = size.width / (count + 1);
 
     for (var i = 0; i < count; i++) {
