@@ -8,10 +8,10 @@ import 'auth/login_screen.dart';
 import 'home/main_nav_screen.dart';
 
 // ── Palette shared with LoginScreen ──────────────────────────────────────────
-const _bg        = Color(0xFF0D0E17);
-const _purple    = Color(0xFF5B5BD6);
-const _textMain  = Color(0xFFFFFFFF);
-const _textSub   = Color(0xFF8E90A8);
+const _bg = Color(0xFF0D0E17);
+const _purple = Color(0xFF5B5BD6);
+const _textMain = Color(0xFFFFFFFF);
+const _textSub = Color(0xFF8E90A8);
 const _textLight = Color(0xFF545670);
 
 class SplashScreen extends StatefulWidget {
@@ -69,28 +69,33 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           // Subtle radial glows
           Positioned(
-            top: -120, right: -80,
+            top: -120,
+            right: -80,
             child: Container(
-              width: 360, height: 360,
+              width: 360,
+              height: 360,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  _purple.withOpacity(0.10),
-                  Colors.transparent,
-                ]),
+                gradient: RadialGradient(
+                  colors: [_purple.withOpacity(0.10), Colors.transparent],
+                ),
               ),
             ),
           ),
           Positioned(
-            bottom: -100, left: -60,
+            bottom: -100,
+            left: -60,
             child: Container(
-              width: 320, height: 320,
+              width: 320,
+              height: 320,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  const Color(0xFF3D4FD6).withOpacity(0.08),
-                  Colors.transparent,
-                ]),
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF3D4FD6).withOpacity(0.08),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
@@ -102,40 +107,40 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 // ── Logo ───────────────────────────────────────────────────
                 AnimatedBuilder(
-                  animation: _pulseCtrl,
-                  builder: (_, child) => Transform.scale(
-                    scale: 1.0 + _pulseCtrl.value * 0.025,
-                    child: child,
-                  ),
-                  child: SwaplyLogoWidget(size: 96),
-                )
-                .animate()
-                .scale(
-                  duration: 600.ms,
-                  curve: Curves.elasticOut,
-                  begin: const Offset(0.6, 0.6),
-                )
-                .fadeIn(),
+                      animation: _pulseCtrl,
+                      builder: (_, child) => Transform.scale(
+                        scale: 1.0 + _pulseCtrl.value * 0.025,
+                        child: child,
+                      ),
+                      child: SwaplyLogoWidget(size: 96),
+                    )
+                    .animate()
+                    .scale(
+                      duration: 600.ms,
+                      curve: Curves.elasticOut,
+                      begin: const Offset(0.6, 0.6),
+                    )
+                    .fadeIn(),
 
                 const SizedBox(height: 22),
 
                 Text(
-                  'Swaply',
-                  style: GoogleFonts.dmSans(
-                    color: _textMain,
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1.2,
-                  ),
-                )
-                .animate()
-                .fadeIn(delay: 280.ms)
-                .slideY(begin: 0.25, curve: Curves.easeOutCubic),
+                      'Swaply',
+                      style: GoogleFonts.dmSans(
+                        color: _textMain,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.2,
+                      ),
+                    )
+                    .animate()
+                    .fadeIn(delay: 280.ms)
+                    .slideY(begin: 0.25, curve: Curves.easeOutCubic),
 
                 const SizedBox(height: 6),
 
                 Text(
-                  'Campus Skill Barter',
+                  'Campus Skill Swap',
                   style: GoogleFonts.dmSans(
                     color: _textSub,
                     fontSize: 14,
@@ -151,24 +156,24 @@ class _SplashScreenState extends State<SplashScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(3, (i) {
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: _purple.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                    )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .scaleXY(
-                      delay: Duration(milliseconds: 500 + i * 150),
-                      duration: 600.ms,
-                      begin: 0.5,
-                      end: 1.2,
-                      curve: Curves.easeInOut,
-                    )
-                    .then()
-                    .fadeIn();
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: _purple.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                        )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scaleXY(
+                          delay: Duration(milliseconds: 500 + i * 150),
+                          duration: 600.ms,
+                          begin: 0.5,
+                          end: 1.2,
+                          curve: Curves.easeInOut,
+                        )
+                        .then()
+                        .fadeIn();
                   }),
                 ).animate().fadeIn(delay: 600.ms),
               ],
@@ -177,7 +182,9 @@ class _SplashScreenState extends State<SplashScreen>
 
           // Version tag
           Positioned(
-            bottom: 40, left: 0, right: 0,
+            bottom: 40,
+            left: 0,
+            right: 0,
             child: Center(
               child: Text(
                 'v2.0',
