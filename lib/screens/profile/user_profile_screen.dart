@@ -12,6 +12,7 @@ import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/post_card.dart';
 import '../../main.dart';
+import 'package:Swaply/widgets/swap_post_card.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;

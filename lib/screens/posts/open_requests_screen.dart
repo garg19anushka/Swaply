@@ -6,6 +6,7 @@ import '../../services/post_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/post_card.dart';
 import '../../widgets/shimmer_card.dart';
+import 'package:Swaply/widgets/swap_post_card.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  OpenRequestsScreen
@@ -22,7 +23,7 @@ class OpenRequestsScreen extends StatefulWidget {
 
 class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
   // ── theme shortcuts ──────────────────────────────────────────────────────
-  bool  get _d  => Theme.of(context).brightness == Brightness.dark;
+  bool get _d => Theme.of(context).brightness == Brightness.dark;
   Color get _bg => _d ? const Color(0xFF111318) : Colors.white;
   Color get _sf => _d ? const Color(0xFF1A1D24) : Colors.white;
   Color get _bd => _d ? const Color(0xFF2A2D36) : const Color(0xFFEFEFEF);
@@ -45,7 +46,6 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-
           // ── Neutral sticky app bar ──────────────────────────────────
           SliverAppBar(
             pinned: true,
@@ -54,15 +54,22 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
             scrolledUnderElevation: 0,
             surfaceTintColor: Colors.transparent,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios_new_rounded,
-                  color: _tp, size: 19),
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: _tp,
+                size: 19,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
-            title: Text('Open Requests',
-                style: GoogleFonts.dmSans(
-                  color: _tp, fontSize: 18,
-                  fontWeight: FontWeight.w800, letterSpacing: -0.4,
-                )),
+            title: Text(
+              'Open Requests',
+              style: GoogleFonts.dmSans(
+                color: _tp,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
             centerTitle: false,
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
@@ -76,23 +83,33 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withOpacity(_d ? 0.1 : 0.07),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: AppColors.warning.withOpacity(0.3), width: 1),
+                    color: AppColors.warning.withOpacity(0.3),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded,
-                        color: AppColors.warning, size: 18),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.warning,
+                      size: 18,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Students posting requests for help — respond by starting a chat!',
                         style: GoogleFonts.dmSans(
-                            color: _ts, fontSize: 12.5, height: 1.4),
+                          color: _ts,
+                          fontSize: 12.5,
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   ],
@@ -104,7 +121,6 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
           // ── Content ─────────────────────────────────────────────────
           Consumer<PostService>(
             builder: (_, ps, __) {
-
               // Loading shimmer
               if (ps.isLoading && ps.openRequests.isEmpty) {
                 return SliverPadding(
@@ -131,22 +147,28 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
                             color: AppColors.warning.withOpacity(0.08),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.help_outline_rounded,
-                              size: 44, color: _tl),
+                          child: Icon(
+                            Icons.help_outline_rounded,
+                            size: 44,
+                            color: _tl,
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        Text('No open requests yet',
-                            style: GoogleFonts.dmSans(
-                              color: _tp, fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            )),
+                        Text(
+                          'No open requests yet',
+                          style: GoogleFonts.dmSans(
+                            color: _tp,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 5),
-                        Text('Be the first to post a help request!',
-                            style: GoogleFonts.dmSans(
-                                color: _ts, fontSize: 13)),
+                        Text(
+                          'Be the first to post a help request!',
+                          style: GoogleFonts.dmSans(color: _ts, fontSize: 13),
+                        ),
                       ],
-                    ).animate().fadeIn().scale(
-                        begin: const Offset(0.92, 0.92)),
+                    ).animate().fadeIn().scale(begin: const Offset(0.92, 0.92)),
                   ),
                 );
               }
@@ -156,18 +178,19 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (_, i) => PostCard(
-                      post: ps.openRequests[i],
-                      onBookmarkToggle: () =>
-                          ps.toggleBookmark(ps.openRequests[i].id),
-                    )
-                        .animate()
-                        .fadeIn(delay: Duration(milliseconds: i * 55))
-                        .slideY(
-                          begin: 0.06,
-                          delay: Duration(milliseconds: i * 55),
-                          curve: Curves.easeOutCubic,
-                        ),
+                    (_, i) =>
+                        PostCard(
+                              post: ps.openRequests[i],
+                              onBookmarkToggle: () =>
+                                  ps.toggleBookmark(ps.openRequests[i].id),
+                            )
+                            .animate()
+                            .fadeIn(delay: Duration(milliseconds: i * 55))
+                            .slideY(
+                              begin: 0.06,
+                              delay: Duration(milliseconds: i * 55),
+                              curve: Curves.easeOutCubic,
+                            ),
                     childCount: ps.openRequests.length,
                   ),
                 ),

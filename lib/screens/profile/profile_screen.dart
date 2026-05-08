@@ -15,6 +15,7 @@ import '../auth/login_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
+import 'package:Swaply/widgets/swap_post_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -626,10 +627,16 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           backgroundColor: sf,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Change Password / Email',
-            style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16),
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -641,10 +648,23 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
                 decoration: InputDecoration(
                   labelText: 'New Email',
                   labelStyle: GoogleFonts.dmSans(color: ts, fontSize: 13),
-                  prefixIcon: Icon(Icons.mail_outline_rounded, color: ts, size: 18),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: bd)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  prefixIcon: Icon(
+                    Icons.mail_outline_rounded,
+                    color: ts,
+                    size: 18,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bd),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -655,14 +675,33 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
                 decoration: InputDecoration(
                   labelText: 'New Password',
                   labelStyle: GoogleFonts.dmSans(color: ts, fontSize: 13),
-                  prefixIcon: Icon(Icons.lock_outline_rounded, color: ts, size: 18),
+                  prefixIcon: Icon(
+                    Icons.lock_outline_rounded,
+                    color: ts,
+                    size: 18,
+                  ),
                   suffixIcon: IconButton(
-                    icon: Icon(obscurePass ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: ts, size: 18),
+                    icon: Icon(
+                      obscurePass
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: ts,
+                      size: 18,
+                    ),
                     onPressed: () => setS(() => obscurePass = !obscurePass),
                   ),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: bd)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bd),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -673,31 +712,64 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
                 decoration: InputDecoration(
                   labelText: 'Confirm Password',
                   labelStyle: GoogleFonts.dmSans(color: ts, fontSize: 13),
-                  prefixIcon: Icon(Icons.lock_outline_rounded, color: ts, size: 18),
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: ts, size: 18),
-                    onPressed: () => setS(() => obscureConfirm = !obscureConfirm),
+                  prefixIcon: Icon(
+                    Icons.lock_outline_rounded,
+                    color: ts,
+                    size: 18,
                   ),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: bd)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      obscureConfirm
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: ts,
+                      size: 18,
+                    ),
+                    onPressed: () =>
+                        setS(() => obscureConfirm = !obscureConfirm),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: bd),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 12,
+                  ),
                 ),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.dmSans(color: tl))),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.dmSans(color: tl)),
+            ),
             ElevatedButton(
               onPressed: () {
-                if (passCtrl.text.isNotEmpty && passCtrl.text != confirmCtrl.text) {
+                if (passCtrl.text.isNotEmpty &&
+                    passCtrl.text != confirmCtrl.text) {
                   _snack('Passwords do not match', color: AppColors.error);
                   return;
                 }
                 Navigator.pop(ctx);
                 _snack('Changes saved successfully!', color: AppColors.success);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-              child: Text('Save Changes', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                elevation: 0,
+              ),
+              child: Text(
+                'Save Changes',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -712,20 +784,42 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
       builder: (ctx) => AlertDialog(
         backgroundColor: sf,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Download My Data', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text(
+          'Download My Data',
+          style: GoogleFonts.dmSans(
+            color: tp,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
         content: Text(
           'We will prepare a copy of your data including your profile, posts, and swap history. You will be notified when it\'s ready.',
           style: GoogleFonts.dmSans(color: ts, fontSize: 13),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.dmSans(color: tl))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.dmSans(color: tl)),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _snack('Your data export has been requested!', color: AppColors.success);
+              _snack(
+                'Your data export has been requested!',
+                color: AppColors.success,
+              );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-            child: Text('Request Export', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+            ),
+            child: Text(
+              'Request Export',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -743,30 +837,73 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 20),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.swap_horiz_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 10),
-            Text('About Swaply', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16)),
+            Text(
+              'About Swaply',
+              style: GoogleFonts.dmSans(
+                color: tp,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Version 1.0.0 (Build 1)', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(
+              'Version 1.0.0 (Build 1)',
+              style: GoogleFonts.dmSans(
+                color: tp,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('Swaply is a skill-swap platform where users can exchange their talents and abilities with others.', style: GoogleFonts.dmSans(color: ts, fontSize: 13)),
+            Text(
+              'Swaply is a skill-swap platform where users can exchange their talents and abilities with others.',
+              style: GoogleFonts.dmSans(color: ts, fontSize: 13),
+            ),
             const SizedBox(height: 12),
-            Text('Developed by', style: GoogleFonts.dmSans(color: tl, fontSize: 11)),
-            Text('Anushka Garg', style: GoogleFonts.dmSans(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+            Text(
+              'Developed by',
+              style: GoogleFonts.dmSans(color: tl, fontSize: 11),
+            ),
+            Text(
+              'Anushka Garg',
+              style: GoogleFonts.dmSans(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-            child: Text('Close', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+            ),
+            child: Text(
+              'Close',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -776,18 +913,40 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
   void _showFAQsDialog() {
     widget.onClose();
     final faqs = [
-      ('How do I create a swap post?', 'Tap the + Post button in the bottom nav, fill in what skill you offer and what you want in return.'),
-      ('How does the rating system work?', 'After completing a swap, both parties can rate each other from 1–5 stars. Ratings affect your leaderboard position.'),
-      ('Can I cancel a swap request?', 'Yes! Go to the swap in your Chats tab and tap "Cancel Request" before the other party accepts.'),
-      ('Is Swaply free to use?', 'Yes, Swaply is completely free. All skill swaps are peer-to-peer with no monetary transactions.'),
-      ('How do I report a user?', 'Open the user\'s profile, tap the three-dot menu in the top right and select "Report User".'),
+      (
+        'How do I create a swap post?',
+        'Tap the + Post button in the bottom nav, fill in what skill you offer and what you want in return.',
+      ),
+      (
+        'How does the rating system work?',
+        'After completing a swap, both parties can rate each other from 1–5 stars. Ratings affect your leaderboard position.',
+      ),
+      (
+        'Can I cancel a swap request?',
+        'Yes! Go to the swap in your Chats tab and tap "Cancel Request" before the other party accepts.',
+      ),
+      (
+        'Is Swaply free to use?',
+        'Yes, Swaply is completely free. All skill swaps are peer-to-peer with no monetary transactions.',
+      ),
+      (
+        'How do I report a user?',
+        'Open the user\'s profile, tap the three-dot menu in the top right and select "Report User".',
+      ),
     ];
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: sf,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Frequently Asked Questions', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text(
+          'Frequently Asked Questions',
+          style: GoogleFonts.dmSans(
+            color: tp,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.separated(
@@ -797,9 +956,19 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
             itemBuilder: (_, i) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(faqs[i].$1, style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(
+                  faqs[i].$1,
+                  style: GoogleFonts.dmSans(
+                    color: tp,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(faqs[i].$2, style: GoogleFonts.dmSans(color: ts, fontSize: 12)),
+                Text(
+                  faqs[i].$2,
+                  style: GoogleFonts.dmSans(color: ts, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -807,8 +976,17 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-            child: Text('Got it', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+            ),
+            child: Text(
+              'Got it',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -823,12 +1001,22 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
       builder: (ctx) => AlertDialog(
         backgroundColor: sf,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Contact Developer', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text(
+          'Contact Developer',
+          style: GoogleFonts.dmSans(
+            color: tp,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Have a bug to report or a suggestion? We\'d love to hear from you!', style: GoogleFonts.dmSans(color: ts, fontSize: 13)),
+            Text(
+              'Have a bug to report or a suggestion? We\'d love to hear from you!',
+              style: GoogleFonts.dmSans(color: ts, fontSize: 13),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: msgCtrl,
@@ -837,15 +1025,24 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
               decoration: InputDecoration(
                 hintText: 'Write your message here...',
                 hintStyle: GoogleFonts.dmSans(color: tl, fontSize: 13),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: bd)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: bd),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
                 contentPadding: const EdgeInsets.all(12),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: GoogleFonts.dmSans(color: tl))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.dmSans(color: tl)),
+          ),
           ElevatedButton(
             onPressed: () {
               if (msgCtrl.text.trim().isEmpty) {
@@ -853,10 +1050,22 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
                 return;
               }
               Navigator.pop(ctx);
-              _snack('Message sent! We\'ll get back to you soon.', color: AppColors.success);
+              _snack(
+                'Message sent! We\'ll get back to you soon.',
+                color: AppColors.success,
+              );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-            child: Text('Send', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+            ),
+            child: Text(
+              'Send',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -870,28 +1079,67 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
       builder: (ctx) => AlertDialog(
         backgroundColor: sf,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Terms & Privacy Policy', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text(
+          'Terms & Privacy Policy',
+          style: GoogleFonts.dmSans(
+            color: tp,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Terms of Service', style: GoogleFonts.dmSans(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+              Text(
+                'Terms of Service',
+                style: GoogleFonts.dmSans(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 6),
-              Text('By using Swaply, you agree to exchange skills fairly and honestly. You must not use the platform for any illegal activity, harassment, or misrepresentation of your skills.', style: GoogleFonts.dmSans(color: ts, fontSize: 12)),
+              Text(
+                'By using Swaply, you agree to exchange skills fairly and honestly. You must not use the platform for any illegal activity, harassment, or misrepresentation of your skills.',
+                style: GoogleFonts.dmSans(color: ts, fontSize: 12),
+              ),
               const SizedBox(height: 12),
-              Text('Privacy Policy', style: GoogleFonts.dmSans(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+              Text(
+                'Privacy Policy',
+                style: GoogleFonts.dmSans(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 6),
-              Text('We collect only the data necessary to operate the platform (profile info, posts, swap history). We never sell your data to third parties. You may request deletion of your account and data at any time.', style: GoogleFonts.dmSans(color: ts, fontSize: 12)),
+              Text(
+                'We collect only the data necessary to operate the platform (profile info, posts, swap history). We never sell your data to third parties. You may request deletion of your account and data at any time.',
+                style: GoogleFonts.dmSans(color: ts, fontSize: 12),
+              ),
               const SizedBox(height: 12),
-              Text('Last updated: January 2025', style: GoogleFonts.dmSans(color: tl, fontSize: 11)),
+              Text(
+                'Last updated: January 2025',
+                style: GoogleFonts.dmSans(color: tl, fontSize: 11),
+              ),
             ],
           ),
         ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-            child: Text('I Understand', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              elevation: 0,
+            ),
+            child: Text(
+              'I Understand',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -906,12 +1154,24 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
           backgroundColor: sf,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Rate Swaply', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Rate Swaply',
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Enjoying Swaply? Give us a rating!', style: GoogleFonts.dmSans(color: ts, fontSize: 13)),
+              Text(
+                'Enjoying Swaply? Give us a rating!',
+                style: GoogleFonts.dmSans(color: ts, fontSize: 13),
+              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -921,7 +1181,9 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Icon(
-                        i < selectedStars ? Icons.star_rounded : Icons.star_outline_rounded,
+                        i < selectedStars
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
                         color: AppColors.warning,
                         size: 36,
                       ),
@@ -931,23 +1193,48 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
               ),
               const SizedBox(height: 8),
               Text(
-                ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'][selectedStars],
-                style: GoogleFonts.dmSans(color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 14),
+                [
+                  '',
+                  'Poor',
+                  'Fair',
+                  'Good',
+                  'Great',
+                  'Excellent!',
+                ][selectedStars],
+                style: GoogleFonts.dmSans(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Later', style: GoogleFonts.dmSans(color: tl))),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Later', style: GoogleFonts.dmSans(color: tl)),
+            ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 _snack(
-                  selectedStars >= 4 ? 'Thank you for the $selectedStars-star review! ⭐' : 'Thanks for your feedback! We\'ll keep improving.',
+                  selectedStars >= 4
+                      ? 'Thank you for the $selectedStars-star review! ⭐'
+                      : 'Thanks for your feedback! We\'ll keep improving.',
                   color: AppColors.success,
                 );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, elevation: 0),
-              child: Text('Submit', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                elevation: 0,
+              ),
+              child: Text(
+                'Submit',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -967,17 +1254,30 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-              decoration: BoxDecoration(color: sf, border: Border(bottom: BorderSide(color: bd, width: 1))),
+              decoration: BoxDecoration(
+                color: sf,
+                border: Border(bottom: BorderSide(color: bd, width: 1)),
+              ),
               child: Row(
                 children: [
-                  Text('Menu', style: GoogleFonts.dmSans(color: tp, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+                  Text(
+                    'Menu',
+                    style: GoogleFonts.dmSans(
+                      color: tp,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
                   const Spacer(),
                   GestureDetector(
                     onTap: widget.onClose,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: d ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06),
+                        color: d
+                            ? Colors.white.withOpacity(0.08)
+                            : Colors.black.withOpacity(0.06),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(Icons.close_rounded, color: tp, size: 18),
@@ -996,41 +1296,161 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
                     _DrawerSection(label: 'Appearance', tp: tp, ts: ts),
                     Consumer<ThemeProvider>(
                       builder: (_, tp2, __) => _DrawerTile(
-                        icon: tp2.isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                        label: tp2.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                        d: d, sf: sf, bd: bd, tp: tp, ts: ts,
-                        trailing: Switch.adaptive(value: tp2.isDark, onChanged: (_) => tp2.toggleTheme(), activeColor: AppColors.primary),
+                        icon: tp2.isDark
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                        label: tp2.isDark
+                            ? 'Switch to Light Mode'
+                            : 'Switch to Dark Mode',
+                        d: d,
+                        sf: sf,
+                        bd: bd,
+                        tp: tp,
+                        ts: ts,
+                        trailing: Switch.adaptive(
+                          value: tp2.isDark,
+                          onChanged: (_) => tp2.toggleTheme(),
+                          activeColor: AppColors.primary,
+                        ),
                         onTap: () => tp2.toggleTheme(),
                       ),
                     ),
 
                     _DrawerSection(label: 'Leaderboard', tp: tp, ts: ts),
-                    _DrawerTile(icon: Icons.leaderboard_rounded, label: 'Rankings', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: widget.onLeaderboard),
+                    _DrawerTile(
+                      icon: Icons.leaderboard_rounded,
+                      label: 'Rankings',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: widget.onLeaderboard,
+                    ),
 
                     _DrawerSection(label: 'Account', tp: tp, ts: ts),
-                    _DrawerTile(icon: Icons.edit_outlined, label: 'Edit Profile', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: widget.onEditProfile),
-                    _DrawerTile(icon: Icons.lock_outline_rounded, label: 'Change Password / Email', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showChangePasswordDialog),
-                    _DrawerTile(icon: Icons.logout_rounded, label: 'Logout', color: AppColors.warning, d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: widget.onLogout),
-                    _DrawerTile(icon: Icons.delete_outline_rounded, label: 'Delete Account', color: AppColors.error, d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: widget.onDeleteAccount),
+                    _DrawerTile(
+                      icon: Icons.edit_outlined,
+                      label: 'Edit Profile',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: widget.onEditProfile,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.lock_outline_rounded,
+                      label: 'Change Password / Email',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showChangePasswordDialog,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.logout_rounded,
+                      label: 'Logout',
+                      color: AppColors.warning,
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: widget.onLogout,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Delete Account',
+                      color: AppColors.error,
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: widget.onDeleteAccount,
+                    ),
 
                     _DrawerSection(label: 'App Data', tp: tp, ts: ts),
                     _DrawerTile(
                       icon: Icons.cleaning_services_outlined,
                       label: 'Clear Cache',
-                      d: d, sf: sf, bd: bd, tp: tp, ts: ts,
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
                       onTap: () {
                         widget.onClose();
-                        _snack('Cache cleared successfully!', color: AppColors.success);
+                        _snack(
+                          'Cache cleared successfully!',
+                          color: AppColors.success,
+                        );
                       },
                     ),
-                    _DrawerTile(icon: Icons.download_outlined, label: 'Download My Data', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showDownloadDataDialog),
-                    _DrawerTile(icon: Icons.info_outline_rounded, label: 'About App · v1.0.0', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showAboutDialog),
+                    _DrawerTile(
+                      icon: Icons.download_outlined,
+                      label: 'Download My Data',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showDownloadDataDialog,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.info_outline_rounded,
+                      label: 'About App · v1.0.0',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showAboutDialog,
+                    ),
 
                     _DrawerSection(label: 'Support', tp: tp, ts: ts),
-                    _DrawerTile(icon: Icons.help_outline_rounded, label: 'FAQs', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showFAQsDialog),
-                    _DrawerTile(icon: Icons.mail_outline_rounded, label: 'Contact Developer', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showContactDialog),
-                    _DrawerTile(icon: Icons.gavel_outlined, label: 'Terms & Privacy Policy', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showTermsDialog),
-                    _DrawerTile(icon: Icons.star_outline_rounded, label: 'Rate the App', d: d, sf: sf, bd: bd, tp: tp, ts: ts, onTap: _showRateDialog),
+                    _DrawerTile(
+                      icon: Icons.help_outline_rounded,
+                      label: 'FAQs',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showFAQsDialog,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.mail_outline_rounded,
+                      label: 'Contact Developer',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showContactDialog,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.gavel_outlined,
+                      label: 'Terms & Privacy Policy',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showTermsDialog,
+                    ),
+                    _DrawerTile(
+                      icon: Icons.star_outline_rounded,
+                      label: 'Rate the App',
+                      d: d,
+                      sf: sf,
+                      bd: bd,
+                      tp: tp,
+                      ts: ts,
+                      onTap: _showRateDialog,
+                    ),
                   ],
                 ),
               ),
@@ -1046,7 +1466,11 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
 class _DrawerSection extends StatelessWidget {
   final String label;
   final Color tp, ts;
-  const _DrawerSection({required this.label, required this.tp, required this.ts});
+  const _DrawerSection({
+    required this.label,
+    required this.tp,
+    required this.ts,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1054,7 +1478,12 @@ class _DrawerSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
       child: Text(
         label.toUpperCase(),
-        style: GoogleFonts.dmSans(color: ts, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+        style: GoogleFonts.dmSans(
+          color: ts,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.1,
+        ),
       ),
     );
   }
@@ -1096,13 +1525,29 @@ class _DrawerTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(color: c.withOpacity(d ? 0.14 : 0.08), borderRadius: BorderRadius.circular(10)),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: c.withOpacity(d ? 0.14 : 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Icon(icon, color: c, size: 18),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text(label, style: GoogleFonts.dmSans(color: c, fontSize: 14, fontWeight: FontWeight.w500))),
-              if (trailing != null) trailing! else Icon(Icons.chevron_right_rounded, color: ts, size: 18),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.dmSans(
+                    color: c,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (trailing != null)
+                trailing!
+              else
+                Icon(Icons.chevron_right_rounded, color: ts, size: 18),
             ],
           ),
         ),
@@ -1129,7 +1574,14 @@ class _Chip extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.3), width: 1),
       ),
-      child: Text(label, style: GoogleFonts.dmSans(color: color, fontSize: 12.5, fontWeight: FontWeight.w600)),
+      child: Text(
+        label,
+        style: GoogleFonts.dmSans(
+          color: color,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -1156,18 +1608,40 @@ class _StatPanel extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(color: sv, borderRadius: BorderRadius.circular(12), border: Border.all(color: bd, width: 1)),
+        decoration: BoxDecoration(
+          color: sv,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: bd, width: 1),
+        ),
         child: Column(
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (icon != null) ...[Icon(icon, size: 14, color: iconColor ?? AppColors.primary), const SizedBox(width: 3)],
-                Text(value, style: GoogleFonts.dmSans(color: tp, fontSize: 18, fontWeight: FontWeight.w800)),
+                if (icon != null) ...[
+                  Icon(icon, size: 14, color: iconColor ?? AppColors.primary),
+                  const SizedBox(width: 3),
+                ],
+                Text(
+                  value,
+                  style: GoogleFonts.dmSans(
+                    color: tp,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 2),
-            Text(label, style: GoogleFonts.dmSans(color: ts, fontSize: 10, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                color: ts,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -1180,7 +1654,15 @@ class _ReviewCard extends StatelessWidget {
   final bool d;
   final Color sf, bd, tp, ts, tl;
 
-  const _ReviewCard({required this.rating, required this.d, required this.sf, required this.bd, required this.tp, required this.ts, required this.tl});
+  const _ReviewCard({
+    required this.rating,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1191,19 +1673,41 @@ class _ReviewCard extends StatelessWidget {
         color: sf,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: bd, width: 1),
-        boxShadow: d ? [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 8, offset: const Offset(0, 2))] : AppShadows.card,
+        boxShadow: d
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.18),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AvatarWidget(avatarUrl: rating.rater?.avatarUrl, username: rating.rater?.username ?? '', radius: 16),
+              AvatarWidget(
+                avatarUrl: rating.rater?.avatarUrl,
+                username: rating.rater?.username ?? '',
+                radius: 16,
+              ),
               const SizedBox(width: 8),
-              Expanded(child: Text(rating.rater?.fullName ?? rating.rater?.username ?? 'User', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w600, fontSize: 13))),
+              Expanded(
+                child: Text(
+                  rating.rater?.fullName ?? rating.rater?.username ?? 'User',
+                  style: GoogleFonts.dmSans(
+                    color: tp,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
               RatingBarIndicator(
                 rating: rating.rating.toDouble(),
-                itemBuilder: (_, __) => const Icon(Icons.star_rounded, color: AppColors.warning),
+                itemBuilder: (_, __) =>
+                    const Icon(Icons.star_rounded, color: AppColors.warning),
                 itemCount: 5,
                 itemSize: 15,
               ),
@@ -1211,10 +1715,16 @@ class _ReviewCard extends StatelessWidget {
           ),
           if (rating.review != null && rating.review!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(rating.review!, style: GoogleFonts.dmSans(color: ts, fontSize: 13, height: 1.5)),
+            Text(
+              rating.review!,
+              style: GoogleFonts.dmSans(color: ts, fontSize: 13, height: 1.5),
+            ),
           ],
           const SizedBox(height: 5),
-          Text(rating.createdAt.toString().substring(0, 10), style: GoogleFonts.dmSans(color: tl, fontSize: 11)),
+          Text(
+            rating.createdAt.toString().substring(0, 10),
+            style: GoogleFonts.dmSans(color: tl, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -1228,7 +1738,15 @@ class _PostsTab extends StatefulWidget {
   final String userId;
   final bool d;
   final Color sf, bd, tp, ts, tl;
-  const _PostsTab({required this.userId, required this.d, required this.sf, required this.bd, required this.tp, required this.ts, required this.tl});
+  const _PostsTab({
+    required this.userId,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+  });
 
   @override
   State<_PostsTab> createState() => _PostsTabState();
@@ -1252,23 +1770,56 @@ class _PostsTabState extends State<_PostsTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2));
-    if (_posts.isEmpty) return _empty(Icons.post_add_rounded, 'No posts yet', widget.ts, widget.tl);
-    return ListView.builder(padding: const EdgeInsets.only(top: 8), itemCount: _posts.length, itemBuilder: (_, i) => PostCard(post: _posts[i]));
+    if (_loading)
+      return Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2,
+        ),
+      );
+    if (_posts.isEmpty)
+      return _empty(
+        Icons.post_add_rounded,
+        'No posts yet',
+        widget.ts,
+        widget.tl,
+      );
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8),
+      itemCount: _posts.length,
+      itemBuilder: (_, i) => PostCard(post: _posts[i]),
+    );
   }
 }
 
 class _BookmarksTab extends StatelessWidget {
   final bool d;
   final Color sf, bd, tp, ts, tl;
-  const _BookmarksTab({required this.d, required this.sf, required this.bd, required this.tp, required this.ts, required this.tl});
+  const _BookmarksTab({
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Consumer<PostService>(
       builder: (_, ps, __) {
-        if (ps.bookmarkedPosts.isEmpty) return _empty(Icons.bookmark_outline_rounded, 'No bookmarks yet', ts, tl);
-        return ListView.builder(padding: const EdgeInsets.only(top: 8), itemCount: ps.bookmarkedPosts.length, itemBuilder: (_, i) => PostCard(post: ps.bookmarkedPosts[i]));
+        if (ps.bookmarkedPosts.isEmpty)
+          return _empty(
+            Icons.bookmark_outline_rounded,
+            'No bookmarks yet',
+            ts,
+            tl,
+          );
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 8),
+          itemCount: ps.bookmarkedPosts.length,
+          itemBuilder: (_, i) => PostCard(post: ps.bookmarkedPosts[i]),
+        );
       },
     );
   }
@@ -1280,25 +1831,69 @@ class _HistoryTab extends StatelessWidget {
   final bool isLoading, d;
   final Color sf, sv, bd, tp, ts, tl;
 
-  const _HistoryTab({required this.swaps, required this.ratings, required this.isLoading, required this.d, required this.sf, required this.sv, required this.bd, required this.tp, required this.ts, required this.tl});
+  const _HistoryTab({
+    required this.swaps,
+    required this.ratings,
+    required this.isLoading,
+    required this.d,
+    required this.sf,
+    required this.sv,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) return Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2));
-    if (swaps.isEmpty && ratings.isEmpty) return _empty(Icons.history_rounded, 'No swap history yet', ts, tl);
+    if (isLoading)
+      return Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2,
+        ),
+      );
+    if (swaps.isEmpty && ratings.isEmpty)
+      return _empty(Icons.history_rounded, 'No swap history yet', ts, tl);
     return ListView(
       padding: const EdgeInsets.only(top: 8),
       children: [
         if (swaps.isNotEmpty) ...[
-          Text('Swaps', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 14)),
+          Text(
+            'Swaps',
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
           const SizedBox(height: 8),
-          ...swaps.map((s) => _SwapTile(swap: s, d: d, sf: sf, bd: bd, tp: tp, ts: ts)),
+          ...swaps.map(
+            (s) => _SwapTile(swap: s, d: d, sf: sf, bd: bd, tp: tp, ts: ts),
+          ),
           const SizedBox(height: 16),
         ],
         if (ratings.isNotEmpty) ...[
-          Text('Ratings Received', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w700, fontSize: 14)),
+          Text(
+            'Ratings Received',
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
           const SizedBox(height: 8),
-          ...ratings.map((r) => _ReviewCard(rating: r, d: d, sf: sf, bd: bd, tp: tp, ts: ts, tl: tl)),
+          ...ratings.map(
+            (r) => _ReviewCard(
+              rating: r,
+              d: d,
+              sf: sf,
+              bd: bd,
+              tp: tp,
+              ts: ts,
+              tl: tl,
+            ),
+          ),
         ],
       ],
     );
@@ -1309,7 +1904,14 @@ class _SwapTile extends StatelessWidget {
   final SwapModel swap;
   final bool d;
   final Color sf, bd, tp, ts;
-  const _SwapTile({required this.swap, required this.d, required this.sf, required this.bd, required this.tp, required this.ts});
+  const _SwapTile({
+    required this.swap,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1323,25 +1925,60 @@ class _SwapTile extends StatelessWidget {
         color: sf,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: bd, width: 1),
-        boxShadow: d ? [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2))] : AppShadows.card,
+        boxShadow: d
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : AppShadows.card,
       ),
       child: Row(
         children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: sc.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Icons.swap_horiz_rounded, color: sc, size: 18)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: sc.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.swap_horiz_rounded, color: sc, size: 18),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Swap ${swap.id.substring(0, 8)}...', style: GoogleFonts.dmSans(color: tp, fontWeight: FontWeight.w600, fontSize: 13)),
-                Text(swap.createdAt.toString().substring(0, 10), style: GoogleFonts.dmSans(color: ts, fontSize: 11)),
+                Text(
+                  'Swap ${swap.id.substring(0, 8)}...',
+                  style: GoogleFonts.dmSans(
+                    color: tp,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  swap.createdAt.toString().substring(0, 10),
+                  style: GoogleFonts.dmSans(color: ts, fontSize: 11),
+                ),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-            decoration: BoxDecoration(color: sc.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-            child: Text(swap.status.toUpperCase(), style: GoogleFonts.dmSans(color: sc, fontSize: 10, fontWeight: FontWeight.w700)),
+            decoration: BoxDecoration(
+              color: sc.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              swap.status.toUpperCase(),
+              style: GoogleFonts.dmSans(
+                color: sc,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -1355,47 +1992,128 @@ class _AnalyticsTab extends StatelessWidget {
   final bool isLoading, d;
   final Color sf, sv, bd, tp, ts;
 
-  const _AnalyticsTab({required this.swaps, required this.ratings, required this.isLoading, required this.d, required this.sf, required this.sv, required this.bd, required this.tp, required this.ts});
+  const _AnalyticsTab({
+    required this.swaps,
+    required this.ratings,
+    required this.isLoading,
+    required this.d,
+    required this.sf,
+    required this.sv,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) return Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2));
+    if (isLoading)
+      return Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2,
+        ),
+      );
     final completed = swaps.where((s) => s.status == 'completed').length;
-    final avgRating = ratings.isEmpty ? 0.0 : ratings.fold(0.0, (sum, r) => sum + r.rating) / ratings.length;
+    final avgRating = ratings.isEmpty
+        ? 0.0
+        : ratings.fold(0.0, (sum, r) => sum + r.rating) / ratings.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Overview', style: GoogleFonts.dmSans(color: tp, fontSize: 14, fontWeight: FontWeight.w700)),
+          Text(
+            'Overview',
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _MetricCard(title: 'Completed', value: '$completed', icon: Icons.check_circle_outline, color: AppColors.success, d: d, sf: sf, bd: bd, tp: tp, ts: ts)),
+              Expanded(
+                child: _MetricCard(
+                  title: 'Completed',
+                  value: '$completed',
+                  icon: Icons.check_circle_outline,
+                  color: AppColors.success,
+                  d: d,
+                  sf: sf,
+                  bd: bd,
+                  tp: tp,
+                  ts: ts,
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: _MetricCard(title: 'Avg Rating', value: avgRating > 0 ? avgRating.toStringAsFixed(1) : '-', icon: Icons.star_outline, color: AppColors.warning, d: d, sf: sf, bd: bd, tp: tp, ts: ts)),
+              Expanded(
+                child: _MetricCard(
+                  title: 'Avg Rating',
+                  value: avgRating > 0 ? avgRating.toStringAsFixed(1) : '-',
+                  icon: Icons.star_outline,
+                  color: AppColors.warning,
+                  d: d,
+                  sf: sf,
+                  bd: bd,
+                  tp: tp,
+                  ts: ts,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           if (ratings.isNotEmpty) ...[
-            Text('Rating Trend', style: GoogleFonts.dmSans(color: tp, fontSize: 14, fontWeight: FontWeight.w700)),
+            Text(
+              'Rating Trend',
+              style: GoogleFonts.dmSans(
+                color: tp,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 10),
             Container(
               height: 140,
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: sf, borderRadius: BorderRadius.circular(14), border: Border.all(color: bd, width: 1)),
+              decoration: BoxDecoration(
+                color: sf,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: bd, width: 1),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: ratings.take(5).toList().reversed.map((r) => Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(r.rating.toStringAsFixed(1), style: GoogleFonts.dmSans(color: tp, fontSize: 9, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 3),
-                    Container(width: 28, height: (100 * (r.rating / 5.0)).clamp(8.0, 100.0), decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(4))),
-                  ],
-                )).toList(),
+                children: ratings
+                    .take(5)
+                    .toList()
+                    .reversed
+                    .map(
+                      (r) => Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            r.rating.toStringAsFixed(1),
+                            style: GoogleFonts.dmSans(
+                              color: tp,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Container(
+                            width: 28,
+                            height: (100 * (r.rating / 5.0)).clamp(8.0, 100.0),
+                            decoration: BoxDecoration(
+                              gradient: AppColors.primaryGradient,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    .toList(),
               ),
             ),
           ],
@@ -1410,7 +2128,17 @@ class _MetricCard extends StatelessWidget {
   final IconData icon;
   final Color color, sf, bd, tp, ts;
   final bool d;
-  const _MetricCard({required this.title, required this.value, required this.icon, required this.color, required this.d, required this.sf, required this.bd, required this.tp, required this.ts});
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1420,14 +2148,29 @@ class _MetricCard extends StatelessWidget {
         color: sf,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: bd, width: 1),
-        boxShadow: d ? [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))] : AppShadows.card,
+        boxShadow: d
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
-          Text(value, style: GoogleFonts.dmSans(color: tp, fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(
+            value,
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 2),
           Text(title, style: GoogleFonts.dmSans(color: ts, fontSize: 11)),
         ],
