@@ -17,7 +17,6 @@ import '../posts/create_post_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../../widgets/chatbot_widget.dart';
 import 'package:Swaply/widgets/swap_post_card.dart';
-
 typedef TabSwitchCallback = void Function(int index);
 
 // ─────────────────────────────────────────────────────────────────────────────

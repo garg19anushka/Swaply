@@ -6,19 +6,6 @@ import '../../models/post_model.dart';
 import '../../services/post_service.dart';
 import '../../utils/app_theme.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  CreatePostScreen  —  Matches the dark design exactly.
-//  Field order (per spec):
-//    1. Open Request toggle
-//    2. POST DETAILS: Title, Description
-//    3. Skills I Offer
-//    4. Exchange Type (Barter | Custom)
-//    5. Skill You Want in Return  ← swapped to ABOVE "skill offered in return"
-//    6. AVAILABILITY chips
-//    7. SESSION FORMAT (Online | In-Person | Hybrid)
-//    8. Publish Skill Post button
-// ═══════════════════════════════════════════════════════════════════════════
-
 class CreatePostScreen extends StatefulWidget {
   final PostModel? post;
   const CreatePostScreen({super.key, this.post});
@@ -45,7 +32,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isOpenRequest = false;
   bool _isLoading = false;
 
-  // Availability chips
   final _availabilityOptions = [
     'Weekends',
     'Evenings',
@@ -53,24 +39,26 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     'Online Only',
   ];
   final Set<String> _selectedAvailability = {};
+  String _sessionFormat = 'online';
 
-  // Session format
-  String _sessionFormat = 'online'; // 'online' | 'inperson' | 'hybrid'
-
-  // ── Palette ──────────────────────────────────────────────────────────────
-  static const _bg = Color(0xFF0D0E17);
-  static const _surface = Color(0xFF161824);
-  static const _inputBg = Color(0xFF1C1D2A);
-  static const _border = Color(0xFF2E3048);
+  // ── Palette — all non-const getters, resolved inside build() ─────────────
   static const _purple = Color(0xFF6C63FF);
-  static const _textMain = Color(0xFFFFFFFF);
-  static const _textSub = Color(0xFF8E90A8);
-  static const _textHint = Color(0xFF545670);
-  static const _errorRed = Color(0xFFFF5C6A);
-
-  // ── Purple gradient matching Sign In button ───────────────────────────────
   static const _purpleStart = Color(0xFF5B4FE8);
   static const _purpleEnd = Color(0xFF7B6FF0);
+  static const _errorRed = Color(0xFFFF5C6A);
+
+  bool get _dark => Theme.of(context).brightness == Brightness.dark;
+  Color get _bg => _dark ? const Color(0xFF0D0E17) : const Color(0xFFF4F4FB);
+  Color get _surface => _dark ? const Color(0xFF161824) : Colors.white;
+  Color get _inputBg =>
+      _dark ? const Color(0xFF1C1D2A) : const Color(0xFFEFEEF9);
+  Color get _border =>
+      _dark ? const Color(0xFF2E3048) : const Color(0xFFDDDCF0);
+  Color get _textMain => _dark ? Colors.white : const Color(0xFF0D0C1E);
+  Color get _textSub =>
+      _dark ? const Color(0xFF8E90A8) : const Color(0xFF6B698A);
+  Color get _textHint =>
+      _dark ? const Color(0xFF545670) : const Color(0xFFAAAAAC);
 
   @override
   void initState() {
@@ -119,14 +107,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
     final isEdit = widget.post != null;
-
     try {
       PostModel? result;
       if (isEdit) {
@@ -161,7 +146,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           isOpenRequest: _isOpenRequest,
         );
       }
-
       setState(() => _isLoading = false);
       if (result != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -183,7 +167,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               ],
             ),
-            backgroundColor: const Color(0xFF5B4FE8),
+            backgroundColor: const Color(0xFF4B4ACF),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -226,11 +210,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.post != null;
-
     return Scaffold(
       backgroundColor: _bg,
       body: Column(
@@ -245,15 +227,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Open Request toggle ──────────────────────────────
                     _openRequestCard().animate().fadeIn(duration: 300.ms),
                     const SizedBox(height: 20),
 
-                    // ── POST DETAILS label ───────────────────────────────
                     _sectionLabel('POST DETAILS'),
                     const SizedBox(height: 10),
 
-                    // ── Title ────────────────────────────────────────────
                     _inputField(
                       ctrl: _titleCtrl,
                       focus: _titleFocus,
@@ -265,7 +244,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ).animate().fadeIn(delay: 60.ms),
                     const SizedBox(height: 10),
 
-                    // ── Description ──────────────────────────────────────
                     _inputField(
                       ctrl: _descCtrl,
                       focus: _descFocus,
@@ -278,7 +256,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ).animate().fadeIn(delay: 80.ms),
                     const SizedBox(height: 20),
 
-                    // ── Skills I Offer label ─────────────────────────────
                     _sectionLabel('Skills I Offer'),
                     const SizedBox(height: 10),
 
@@ -293,15 +270,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ).animate().fadeIn(delay: 100.ms),
                     const SizedBox(height: 20),
 
-                    // ── Exchange Type label ──────────────────────────────
                     _sectionLabel('Exchange Type'),
                     const SizedBox(height: 10),
 
-                    // ── Barter / Custom selector ─────────────────────────
                     _exchangeSelector().animate().fadeIn(delay: 110.ms),
                     const SizedBox(height: 16),
 
-                    // ── Skill You Want in Return (ABOVE skill offered) ───
                     _sectionLabel('Skill You Want in Return'),
                     const SizedBox(height: 10),
 
@@ -339,21 +313,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ).animate().fadeIn(delay: 120.ms),
                     const SizedBox(height: 20),
 
-                    // ── AVAILABILITY label ───────────────────────────────
                     _sectionLabel('AVAILABILITY'),
                     const SizedBox(height: 10),
 
                     _availabilityChips().animate().fadeIn(delay: 130.ms),
                     const SizedBox(height: 20),
 
-                    // ── SESSION FORMAT label ─────────────────────────────
                     _sectionLabel('SESSION FORMAT'),
                     const SizedBox(height: 10),
 
                     _sessionFormatRow().animate().fadeIn(delay: 140.ms),
                     const SizedBox(height: 28),
 
-                    // ── Publish button ────────────────────────────────────
                     _publishButton(isEdit).animate().fadeIn(delay: 160.ms),
                   ],
                 ),
@@ -365,7 +336,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  // ── App bar — purple gradient, taller height matching home screen ─────────
+  // ── App bar ───────────────────────────────────────────────────────────────
   Widget _buildAppBar(bool isEdit, BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
@@ -382,7 +353,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           IconButton(
             icon: const Icon(
               Icons.chevron_left_rounded,
-              color: _textMain,
+              // FIX: was _textMain (non-const) — use literal white
+              color: Colors.white,
               size: 28,
             ),
             onPressed: () => Navigator.maybePop(context),
@@ -392,7 +364,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             child: Text(
               isEdit ? 'Edit Post' : 'Create Swap Post',
               style: GoogleFonts.dmSans(
-                color: _textMain,
+                // FIX: was _textMain (non-const) — use literal white
+                color: Colors.white,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
@@ -405,19 +378,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   // ── Section label ─────────────────────────────────────────────────────────
-  Widget _sectionLabel(String text) {
-    return Text(
-      text,
-      style: GoogleFonts.dmSans(
-        color: _textMain,
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.3,
-      ),
-    );
-  }
+  Widget _sectionLabel(String text) => Text(
+    text,
+    style: GoogleFonts.dmSans(
+      color: _textMain,
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.3,
+    ),
+  );
 
-  // ── Open Request toggle card ──────────────────────────────────────────────
+  // ── Open Request toggle ───────────────────────────────────────────────────
   Widget _openRequestCard() {
     return GestureDetector(
       onTap: () => setState(() => _isOpenRequest = !_isOpenRequest),
@@ -441,7 +412,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 color: _inputBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.help_outline_rounded,
                 color: _textSub,
                 size: 20,
@@ -518,23 +489,23 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: _border, width: 1.2),
+          borderSide: BorderSide(color: _border, width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: _border, width: 1.2),
+          borderSide: BorderSide(color: _border, width: 1.2),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: _purple, width: 1.6),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(13)),
+          borderSide: BorderSide(color: _purple, width: 1.6),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: _errorRed, width: 1.2),
+        errorBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(13)),
+          borderSide: BorderSide(color: _errorRed, width: 1.2),
         ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: _errorRed, width: 1.6),
+        focusedErrorBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(13)),
+          borderSide: BorderSide(color: _errorRed, width: 1.6),
         ),
         errorStyle: GoogleFonts.dmSans(color: _errorRed, fontSize: 11.5),
       ),
@@ -678,7 +649,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  // ── Session format row ────────────────────────────────────────────────────
+  // ── Session format ────────────────────────────────────────────────────────
   Widget _sessionFormatRow() {
     return Row(
       children: [
@@ -743,7 +714,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  // ── Publish button — purple gradient matching Sign In ─────────────────────
+  // ── Publish button ────────────────────────────────────────────────────────
   Widget _publishButton(bool isEdit) {
     return SizedBox(
       width: double.infinity,

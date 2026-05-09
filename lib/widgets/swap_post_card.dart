@@ -1,25 +1,32 @@
 // lib/widgets/swap_post_card.dart
 //
-// Changes vs previous version:
-//  1. "Swap →" gradient pill button REMOVED from actions row
-//  2. Author avatar now uses AvatarWidget (same as profile screen)
-//     so it shows the real uploaded profile photo from Supabase,
-//     falling back to initials only when no photo exists
+// ─── STEP-BY-STEP SETUP ────────────────────────────────────────────────────
 //
-// Import this file in:
-//   lib/screens/profile/profile_screen.dart
-//   lib/screens/profile/user_profile_screen.dart
-//   lib/screens/posts/open_requests_screen.dart
-//   lib/screens/feed/feed_screen.dart  (also remove SwapPostCard class from there)
+// 1. Save this file as:  lib/widgets/swap_post_card.dart
+//
+// 2. Open lib/screens/feed/feed_screen.dart and DELETE the entire bodies of:
+//      class SwapPostCard ...  (and its State class _SwapPostCardState)
+//      class _SkillPill ...
+//      class _SmallBtn  ...
+//    Then add at the top of feed_screen.dart:
+//      import 'package:Swaply/widgets/swap_post_card.dart';
+//
+// 3. Add the same import to:
+//      lib/screens/profile/profile_screen.dart
+//      lib/screens/profile/user_profile_screen.dart
+//      lib/screens/posts/open_requests_screen.dart
+//
+// No other changes needed anywhere.  PostCard / SwapPostCard both work.
+// ───────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:Swaply/models/post_model.dart';
 import 'package:Swaply/utils/app_theme.dart';
-import 'package:Swaply/widgets/avatar_widget.dart'; // ← real profile photo
+import 'package:Swaply/widgets/avatar_widget.dart'; // real profile photo
 
-// PostCard = SwapPostCard alias — all old call-sites keep working
+/// [PostCard] is an alias so old call-sites like `PostCard(post: x)` compile.
 typedef PostCard = SwapPostCard;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,13 +35,19 @@ typedef PostCard = SwapPostCard;
 class SwapPostCard extends StatefulWidget {
   final PostModel post;
 
+  /// Opens the post detail. Tapping the card body also triggers this.
   final VoidCallback? onSwap;
+
+  /// Bookmark icon tapped.
   final VoidCallback? onBookmark;
 
-  /// Alias used by open_requests_screen — takes priority over onBookmark.
+  /// Alias used by open_requests_screen — wins over [onBookmark] if both set.
   final VoidCallback? onBookmarkToggle;
 
+  /// Author avatar / name tapped.
   final VoidCallback? onTapAuthor;
+
+  /// Shows edit + delete buttons when the current user owns this post.
   final bool isOwn;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
@@ -96,26 +109,30 @@ class _SwapPostCardState extends State<SwapPostCard>
 
   // ── Theme ────────────────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
+
   Color get _cardBg => _d ? const Color(0xFF111126) : Colors.white;
-  Color get _cardBorder => _d ? const Color(0xFF252540) : AppColors.border;
+  Color get _border => _d ? const Color(0xFF252540) : AppColors.border;
   Color get _tp => _d ? const Color(0xFFF0F0FF) : AppColors.textPrimary;
   Color get _ts => _d ? const Color(0xFF9090B0) : AppColors.textSecondary;
   Color get _tl => _d ? const Color(0xFF555575) : AppColors.textLight;
   Color get _divider => _d ? const Color(0xFF1E1E38) : const Color(0xFFEEEEEE);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Data helpers ─────────────────────────────────────────────────────────
   String get _username => widget.post.profile?.username ?? 'user';
-
   String get _displayName =>
       widget.post.profile?.fullName ?? widget.post.profile?.username ?? 'User';
 
-  String get _avatarUrl => widget.post.profile?.avatarUrl ?? '';
+  /// Pass null when empty — AvatarWidget shows coloured initials as fallback.
+  String? get _avatarUrl {
+    final u = widget.post.profile?.avatarUrl ?? '';
+    return u.isNotEmpty ? u : null;
+  }
 
   String get _timeAgo {
-    final diff = DateTime.now().difference(widget.post.createdAt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+    final d = DateTime.now().difference(widget.post.createdAt);
+    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
   }
 
   int get _daysLeft {
@@ -137,8 +154,7 @@ class _SwapPostCardState extends State<SwapPostCard>
       'Saturday',
       'Sunday',
     ];
-    final next = DateTime.now().add(const Duration(days: 2));
-    return 'Busy till ${days[next.weekday - 1]}';
+    return 'Busy till ${days[DateTime.now().add(const Duration(days: 2)).weekday - 1]}';
   }
 
   // ── Build ────────────────────────────────────────────────────────────────
@@ -156,7 +172,7 @@ class _SwapPostCardState extends State<SwapPostCard>
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _cardBorder, width: 1),
+        border: Border.all(color: _border, width: 1),
         boxShadow: _d
             ? [
                 BoxShadow(
@@ -183,7 +199,7 @@ class _SwapPostCardState extends State<SwapPostCard>
                 _buildHeader(post, rating, campus),
                 const SizedBox(height: 14),
 
-                // Title
+                // ── Title ─────────────────────────────────────────────
                 Text(
                   post.title,
                   style: GoogleFonts.dmSans(
@@ -196,7 +212,7 @@ class _SwapPostCardState extends State<SwapPostCard>
                 ),
                 const SizedBox(height: 7),
 
-                // Description
+                // ── Description ───────────────────────────────────────
                 Text(
                   post.description,
                   maxLines: 2,
@@ -210,21 +226,17 @@ class _SwapPostCardState extends State<SwapPostCard>
                 ),
                 const SizedBox(height: 13),
 
-                // Skill pills
                 _buildSkillPills(post),
                 const SizedBox(height: 11),
 
-                // Wants line
                 if (post.skillWanted != null &&
                     post.skillWanted!.trim().isNotEmpty) ...[
                   _buildWantsLine(post.skillWanted!),
                   const SizedBox(height: 11),
                 ],
 
-                // Status row
                 _buildStatusRow(swapCount),
 
-                // Expiry
                 if (_daysLeft <= 7) ...[
                   const SizedBox(height: 9),
                   _buildExpiry(),
@@ -234,8 +246,7 @@ class _SwapPostCardState extends State<SwapPostCard>
                 Divider(height: 1, color: _divider),
                 const SizedBox(height: 10),
 
-                // Actions (no Swap button)
-                _buildActions(),
+                _buildActions(), // ← no Swap button inside
               ],
             ),
           ),
@@ -244,23 +255,28 @@ class _SwapPostCardState extends State<SwapPostCard>
     );
   }
 
-  // ── Header — uses AvatarWidget for real profile photo ────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Header  — AvatarWidget shows the REAL profile photo from Supabase.
+  //  If the user has no photo uploaded, AvatarWidget falls back to
+  //  a coloured circle with initials — exactly like the profile screen.
+  // ─────────────────────────────────────────────────────────────────────────
   Widget _buildHeader(PostModel post, double rating, String campus) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Real profile photo via AvatarWidget ──────────────────────────
+        // ── Profile photo (real data) ─────────────────────────────────
         GestureDetector(
           onTap: widget.onTapAuthor,
           child: AvatarWidget(
-            avatarUrl: _avatarUrl.isNotEmpty ? _avatarUrl : null,
-            username: _username,
-            radius: 23, // 46px diameter — same visual size as before
+            avatarUrl: _avatarUrl, // null → shows initials fallback
+            username: _username, // used for initials + colour seed
+            radius: 23, // 46 px total — same size as before
           ),
         ),
 
         const SizedBox(width: 11),
 
+        // ── Name + meta ───────────────────────────────────────────────
         Expanded(
           child: GestureDetector(
             onTap: widget.onTapAuthor,
@@ -313,7 +329,7 @@ class _SwapPostCardState extends State<SwapPostCard>
           ),
         ),
 
-        // Campus badge
+        // ── Campus badge ──────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
           decoration: BoxDecoration(
@@ -384,7 +400,7 @@ class _SwapPostCardState extends State<SwapPostCard>
 
   // ── Status row ───────────────────────────────────────────────────────────
   Widget _buildStatusRow(int swapCount) {
-    final dotColor = _isAvailableNow
+    final dot = _isAvailableNow
         ? const Color(0xFF00C9A7)
         : const Color(0xFFFFBE0B);
 
@@ -393,9 +409,9 @@ class _SwapPostCardState extends State<SwapPostCard>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: dotColor.withOpacity(0.12),
+            color: dot.withOpacity(0.12),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: dotColor.withOpacity(0.35)),
+            border: Border.all(color: dot.withOpacity(0.35)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -403,16 +419,13 @@ class _SwapPostCardState extends State<SwapPostCard>
               Container(
                 width: 6,
                 height: 6,
-                decoration: BoxDecoration(
-                  color: dotColor,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
               ),
               const SizedBox(width: 5),
               Text(
                 _availLabel,
                 style: GoogleFonts.dmSans(
-                  color: dotColor,
+                  color: dot,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w600,
                 ),
@@ -442,30 +455,30 @@ class _SwapPostCardState extends State<SwapPostCard>
   }
 
   // ── Expiry ───────────────────────────────────────────────────────────────
-  Widget _buildExpiry() {
-    return Row(
-      children: [
-        const Text('⏳', style: TextStyle(fontSize: 12)),
-        const SizedBox(width: 5),
-        Text(
-          _daysLeft == 0
-              ? 'Expires today!'
-              : 'Expires in $_daysLeft day${_daysLeft == 1 ? '' : 's'}',
-          style: GoogleFonts.dmSans(
-            color: const Color(0xFFFFBE0B),
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-          ),
+  Widget _buildExpiry() => Row(
+    children: [
+      const Text('⏳', style: TextStyle(fontSize: 12)),
+      const SizedBox(width: 5),
+      Text(
+        _daysLeft == 0
+            ? 'Expires today!'
+            : 'Expires in $_daysLeft day${_daysLeft == 1 ? '' : 's'}',
+        style: GoogleFonts.dmSans(
+          color: const Color(0xFFFFBE0B),
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 
-  // ── Actions — Swap button REMOVED ────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Actions row — "Swap →" button is intentionally NOT here
+  // ─────────────────────────────────────────────────────────────────────────
   Widget _buildActions() {
     return Row(
       children: [
-        // Like with bounce animation
+        // Like with bounce
         ScaleTransition(
           scale: _likeScale,
           child: GestureDetector(
@@ -530,7 +543,7 @@ class _SwapPostCardState extends State<SwapPostCard>
 
         const Spacer(),
 
-        // Own post: edit + delete only (no Swap button)
+        // Own post: edit + delete only — NO Swap button
         if (widget.isOwn) ...[
           _SmallBtn(
             icon: Icons.edit_outlined,
@@ -544,8 +557,6 @@ class _SwapPostCardState extends State<SwapPostCard>
             onTap: widget.onDelete ?? () {},
           ),
         ],
-
-        // ── "Swap →" button intentionally removed ──
       ],
     );
   }
@@ -590,7 +601,7 @@ class _SkillPill extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Small edit / delete button
+//  Small edit / delete button (own posts only)
 // ─────────────────────────────────────────────────────────────────────────────
 class _SmallBtn extends StatelessWidget {
   final IconData icon;

@@ -20,6 +20,7 @@
         "path_provider",
         "provider",
         "record",
+        "shared_preferences",
         "shimmer",
         "supabase_flutter",
         "timeago",
@@ -56,6 +57,19 @@
       ]
     },
     {
+      "name": "shared_preferences",
+      "version": "2.5.5",
+      "dependencies": [
+        "flutter",
+        "shared_preferences_android",
+        "shared_preferences_foundation",
+        "shared_preferences_linux",
+        "shared_preferences_platform_interface",
+        "shared_preferences_web",
+        "shared_preferences_windows"
+      ]
+    },
+    {
       "name": "path_provider",
       "version": "2.1.5",
       "dependencies": [
@@ -65,6 +79,20 @@
         "path_provider_linux",
         "path_provider_platform_interface",
         "path_provider_windows"
+      ]
+    },
+    {
+      "name": "record",
+      "version": "5.2.1",
+      "dependencies": [
+        "flutter",
+        "record_android",
+        "record_darwin",
+        "record_linux",
+        "record_platform_interface",
+        "record_web",
+        "record_windows",
+        "uuid"
       ]
     },
     {
@@ -298,6 +326,64 @@
       ]
     },
     {
+      "name": "shared_preferences_windows",
+      "version": "2.4.1",
+      "dependencies": [
+        "file",
+        "flutter",
+        "path",
+        "path_provider_platform_interface",
+        "path_provider_windows",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_web",
+      "version": "2.4.3",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins",
+        "shared_preferences_platform_interface",
+        "web"
+      ]
+    },
+    {
+      "name": "shared_preferences_platform_interface",
+      "version": "2.4.2",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_linux",
+      "version": "2.4.1",
+      "dependencies": [
+        "file",
+        "flutter",
+        "path",
+        "path_provider_linux",
+        "path_provider_platform_interface",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_foundation",
+      "version": "2.5.6",
+      "dependencies": [
+        "flutter",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
+      "name": "shared_preferences_android",
+      "version": "2.4.23",
+      "dependencies": [
+        "flutter",
+        "shared_preferences_platform_interface"
+      ]
+    },
+    {
       "name": "path_provider_windows",
       "version": "2.3.0",
       "dependencies": [
@@ -345,6 +431,56 @@
         "jni",
         "jni_flutter",
         "path_provider_platform_interface"
+      ]
+    },
+    {
+      "name": "record_darwin",
+      "version": "1.2.2",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_android",
+      "version": "1.5.1",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_linux",
+      "version": "0.7.2",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_windows",
+      "version": "1.0.7",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_web",
+      "version": "1.3.0",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins",
+        "record_platform_interface",
+        "web"
+      ]
+    },
+    {
+      "name": "record_platform_interface",
+      "version": "1.5.0",
+      "dependencies": [
+        "flutter",
+        "plugin_platform_interface"
       ]
     },
     {
@@ -539,19 +675,6 @@
       "dependencies": []
     },
     {
-      "name": "shared_preferences",
-      "version": "2.5.5",
-      "dependencies": [
-        "flutter",
-        "shared_preferences_android",
-        "shared_preferences_foundation",
-        "shared_preferences_linux",
-        "shared_preferences_platform_interface",
-        "shared_preferences_web",
-        "shared_preferences_windows"
-      ]
-    },
-    {
       "name": "url_launcher",
       "version": "6.3.2",
       "dependencies": [
@@ -665,9 +788,19 @@
       ]
     },
     {
-      "name": "ffi",
-      "version": "2.2.0",
-      "dependencies": []
+      "name": "file",
+      "version": "7.0.1",
+      "dependencies": [
+        "meta",
+        "path"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
     },
     {
       "name": "plugin_platform_interface",
@@ -675,6 +808,11 @@
       "dependencies": [
         "meta"
       ]
+    },
+    {
+      "name": "ffi",
+      "version": "2.2.0",
+      "dependencies": []
     },
     {
       "name": "platform",
@@ -780,14 +918,6 @@
       "dependencies": []
     },
     {
-      "name": "file",
-      "version": "7.0.1",
-      "dependencies": [
-        "meta",
-        "path"
-      ]
-    },
-    {
       "name": "file_selector_windows",
       "version": "0.9.3+5",
       "dependencies": [
@@ -838,75 +968,10 @@
       "dependencies": []
     },
     {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
-      "dependencies": [
-        "flutter"
-      ]
-    },
-    {
       "name": "flutter_plugin_android_lifecycle",
       "version": "2.0.34",
       "dependencies": [
         "flutter"
-      ]
-    },
-    {
-      "name": "shared_preferences_windows",
-      "version": "2.4.1",
-      "dependencies": [
-        "file",
-        "flutter",
-        "path",
-        "path_provider_platform_interface",
-        "path_provider_windows",
-        "shared_preferences_platform_interface"
-      ]
-    },
-    {
-      "name": "shared_preferences_web",
-      "version": "2.4.3",
-      "dependencies": [
-        "flutter",
-        "flutter_web_plugins",
-        "shared_preferences_platform_interface",
-        "web"
-      ]
-    },
-    {
-      "name": "shared_preferences_platform_interface",
-      "version": "2.4.2",
-      "dependencies": [
-        "flutter",
-        "plugin_platform_interface"
-      ]
-    },
-    {
-      "name": "shared_preferences_linux",
-      "version": "2.4.1",
-      "dependencies": [
-        "file",
-        "flutter",
-        "path",
-        "path_provider_linux",
-        "path_provider_platform_interface",
-        "shared_preferences_platform_interface"
-      ]
-    },
-    {
-      "name": "shared_preferences_foundation",
-      "version": "2.5.6",
-      "dependencies": [
-        "flutter",
-        "shared_preferences_platform_interface"
-      ]
-    },
-    {
-      "name": "shared_preferences_android",
-      "version": "2.4.23",
-      "dependencies": [
-        "flutter",
-        "shared_preferences_platform_interface"
       ]
     },
     {
@@ -1243,70 +1308,6 @@
       "dependencies": [
         "collection",
         "convert"
-      ]
-    },
-    {
-      "name": "record",
-      "version": "5.2.1",
-      "dependencies": [
-        "flutter",
-        "record_android",
-        "record_darwin",
-        "record_linux",
-        "record_platform_interface",
-        "record_web",
-        "record_windows",
-        "uuid"
-      ]
-    },
-    {
-      "name": "record_windows",
-      "version": "1.0.7",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
-      ]
-    },
-    {
-      "name": "record_platform_interface",
-      "version": "1.5.0",
-      "dependencies": [
-        "flutter",
-        "plugin_platform_interface"
-      ]
-    },
-    {
-      "name": "record_darwin",
-      "version": "1.2.2",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
-      ]
-    },
-    {
-      "name": "record_linux",
-      "version": "0.7.2",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
-      ]
-    },
-    {
-      "name": "record_web",
-      "version": "1.3.0",
-      "dependencies": [
-        "flutter",
-        "flutter_web_plugins",
-        "record_platform_interface",
-        "web"
-      ]
-    },
-    {
-      "name": "record_android",
-      "version": "1.5.1",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
       ]
     }
   ],

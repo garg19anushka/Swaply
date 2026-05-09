@@ -440,15 +440,11 @@ class _HeroButtonState extends State<_HeroButton>
   Widget _grad() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-      ),
+      color: const Color(0xFF4B4ACF),
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF7C5CFC).withOpacity(0.38),
+          color: const Color(0xFF4B4ACF).withOpacity(0.40),
           blurRadius: 14,
           offset: const Offset(0, 4),
         ),

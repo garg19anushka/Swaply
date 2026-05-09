@@ -346,31 +346,30 @@ class _ChatbotDialogState extends State<_ChatbotDialog> {
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
                 decoration: BoxDecoration(
-                  // Dark: solid deep surface with primary accent left-border feel
-                  // Light: keep the original warm gradient
-                  gradient: _dark ? null : AppColors.accentGradient,
-                  color: _dark ? const Color(0xFF1A1D24) : null,
-                  border: _dark
-                      ? Border(bottom: BorderSide(color: _bd, width: 1))
-                      : null,
+                  color: const Color(0xFF4B4ACF),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(AppRadius.xxl),
                     topRight: Radius.circular(AppRadius.xxl),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4B4ACF).withOpacity(0.30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: _dark
-                            ? AppColors.primary.withOpacity(0.18)
-                            : Colors.white.withOpacity(0.2),
+                        color: Colors.white.withOpacity(0.18),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.smart_toy_rounded,
-                        color: _dark ? AppColors.primary : Colors.white,
+                        color: Colors.white,
                         size: 20,
                       ),
                     ),
@@ -382,7 +381,7 @@ class _ChatbotDialogState extends State<_ChatbotDialog> {
                           Text(
                             'SkillSwap Assistant',
                             style: GoogleFonts.dmSans(
-                              color: _dark ? _tp : Colors.white,
+                              color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
@@ -390,9 +389,7 @@ class _ChatbotDialogState extends State<_ChatbotDialog> {
                           Text(
                             'Ask me anything about the app',
                             style: GoogleFonts.dmSans(
-                              color: _dark
-                                  ? _ts
-                                  : Colors.white.withOpacity(0.8),
+                              color: Colors.white.withOpacity(0.82),
                               fontSize: 11,
                             ),
                           ),
@@ -517,15 +514,11 @@ class _ChatbotDialogState extends State<_ChatbotDialog> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          gradient: _dark
-                              ? AppColors.primaryGradient
-                              : AppColors.accentGradient,
-                          shape: BoxShape.circle,
+                          color: const Color(0xFF4B4ACF),
+                          borderRadius: BorderRadius.circular(13),
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  (_dark ? AppColors.primary : AppColors.accent)
-                                      .withOpacity(0.35),
+                              color: const Color(0xFF4B4ACF).withOpacity(0.40),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),

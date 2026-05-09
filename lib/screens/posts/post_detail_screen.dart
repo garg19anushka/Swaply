@@ -38,8 +38,8 @@ class PostDetailScreen extends StatelessWidget {
     final ts = dark ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
     final tl = dark ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
 
-    final auth   = context.watch<AuthService>();
-    final isOwn  = auth.currentUser?.id == post.userId;
+    final auth = context.watch<AuthService>();
+    final isOwn = auth.currentUser?.id == post.userId;
 
     return Scaffold(
       backgroundColor: bg,
@@ -58,36 +58,44 @@ class PostDetailScreen extends StatelessWidget {
                       postId: post.id,
                     );
                     if (chat != null && context.mounted) {
-                      Navigator.push(context,
-                          MaterialPageRoute(
-                              builder: (_) => ChatScreen(chat: chat)));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatScreen(chat: chat),
+                        ),
+                      );
                     }
                   },
                   child: Container(
                     height: 52,
                     decoration: BoxDecoration(
-                      gradient: dark ? AppColors.primaryGradient : null,
-                      color: dark ? null : AppColors.primary,
+                      color: const Color(0xFF4B4ACF),
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary
-                              .withOpacity(dark ? 0.28 : 0.20),
-                          blurRadius: 14, offset: const Offset(0, 4),
+                          color: const Color(0xFF4B4ACF).withOpacity(0.40),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.chat_bubble_outline_rounded,
-                            color: Colors.white, size: 18),
+                        const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                         const SizedBox(width: 9),
-                        Text('Start Chat & Swap',
-                            style: GoogleFonts.dmSans(
-                              color: Colors.white, fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            )),
+                        Text(
+                          'Start Chat & Swap',
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -98,103 +106,6 @@ class PostDetailScreen extends StatelessWidget {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-
-          // ── Neutral sticky app bar ──────────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: sf,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            surfaceTintColor: Colors.transparent,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios_new_rounded,
-                  color: tp, size: 19),
-              onPressed: () => Navigator.pop(context),
-            ),
-            // ✦ Title left-aligned, renamed to "Skill Details"
-            title: Text('Skill Details',
-                style: GoogleFonts.dmSans(
-                  color: tp, fontSize: 17,
-                  fontWeight: FontWeight.w700, letterSpacing: -0.3,
-                )),
-            centerTitle: false,
-            actions: [
-              if (!isOwn)
-                IconButton(
-                  icon: Icon(
-                    post.isBookmarked
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_outline_rounded,
-                    color: post.isBookmarked ? AppColors.primary : tp,
-                    size: 22,
-                  ),
-                  onPressed: () =>
-                      context.read<PostService>().toggleBookmark(post.id),
-                ),
-              if (isOwn)
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert_rounded, color: tp),
-                  color: sf,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  onSelected: (val) async {
-                    if (val == 'delete') {
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          backgroundColor: sf,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                          title: Text('Delete Post',
-                              style: GoogleFonts.dmSans(
-                                  color: tp, fontWeight: FontWeight.w700)),
-                          content: Text(
-                              'Are you sure you want to delete this post?',
-                              style: GoogleFonts.dmSans(color: ts)),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: Text('Cancel',
-                                    style: GoogleFonts.dmSans(color: tl))),
-                            TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: Text('Delete',
-                                    style: GoogleFonts.dmSans(
-                                        color: AppColors.error,
-                                        fontWeight: FontWeight.w700))),
-                          ],
-                        ),
-                      );
-                      if (ok == true && context.mounted) {
-                        await context.read<PostService>().deletePost(post.id);
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.delete_outline_rounded,
-                              color: AppColors.error, size: 18),
-                          const SizedBox(width: 8),
-                          Text('Delete Post',
-                              style: GoogleFonts.dmSans(
-                                  color: AppColors.error,
-                                  fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Divider(height: 1, thickness: 1, color: bd),
-            ),
-          ),
-
           // ── Page body ───────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
@@ -202,33 +113,37 @@ class PostDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   // Tags
                   if (post.tags.isNotEmpty) ...[
                     Wrap(
-                      spacing: 7, runSpacing: 6,
-                      children: post.tags
-                          .map((t) => _TagPill(tag: t))
-                          .toList(),
+                      spacing: 7,
+                      runSpacing: 6,
+                      children: post.tags.map((t) => _TagPill(tag: t)).toList(),
                     ).animate().fadeIn(),
                     const SizedBox(height: 14),
                   ],
 
                   // Post title
-                  Text(post.title,
-                      style: GoogleFonts.dmSans(
-                        color: tp, fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5, height: 1.2,
-                      )).animate().fadeIn(delay: 40.ms),
+                  Text(
+                    post.title,
+                    style: GoogleFonts.dmSans(
+                      color: tp,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      height: 1.2,
+                    ),
+                  ).animate().fadeIn(delay: 40.ms),
                   const SizedBox(height: 14),
 
                   // Author row
                   GestureDetector(
-                    onTap: () => Navigator.push(context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                UserProfileScreen(userId: post.userId))),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UserProfileScreen(userId: post.userId),
+                      ),
+                    ),
                     child: Row(
                       children: [
                         AvatarWidget(
@@ -242,19 +157,22 @@ class PostDetailScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                post.profile?.fullName
-                                    ?? post.profile?.username
-                                    ?? 'Unknown',
+                                post.profile?.fullName ??
+                                    post.profile?.username ??
+                                    'Unknown',
                                 style: GoogleFonts.dmSans(
-                                    color: tp,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14),
+                                  color: tp,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
                               ),
                               Text(
                                 '@${post.profile?.username ?? ''} · '
                                 '${timeago.format(post.createdAt)}',
                                 style: GoogleFonts.dmSans(
-                                    color: ts, fontSize: 12),
+                                  color: ts,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -264,23 +182,30 @@ class PostDetailScreen extends StatelessWidget {
                         if ((post.profile?.averageRating ?? 0) > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 9, vertical: 5),
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.warning.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.star_rounded,
-                                    color: AppColors.warning, size: 13),
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: AppColors.warning,
+                                  size: 13,
+                                ),
                                 const SizedBox(width: 3),
                                 Text(
-                                  post.profile!.averageRating
-                                      .toStringAsFixed(1),
+                                  post.profile!.averageRating.toStringAsFixed(
+                                    1,
+                                  ),
                                   style: GoogleFonts.dmSans(
-                                      color: AppColors.warning,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600),
+                                    color: AppColors.warning,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ],
                             ),
@@ -294,22 +219,34 @@ class PostDetailScreen extends StatelessWidget {
                   const SizedBox(height: 18),
 
                   // About this swap
-                  Text('About this swap',
-                      style: GoogleFonts.dmSans(
-                          color: tp, fontSize: 15,
-                          fontWeight: FontWeight.w700)),
+                  Text(
+                    'About this swap',
+                    style: GoogleFonts.dmSans(
+                      color: tp,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  Text(post.description,
-                      style: GoogleFonts.dmSans(
-                          color: ts, fontSize: 14, height: 1.6))
-                      .animate().fadeIn(delay: 120.ms),
+                  Text(
+                    post.description,
+                    style: GoogleFonts.dmSans(
+                      color: ts,
+                      fontSize: 14,
+                      height: 1.6,
+                    ),
+                  ).animate().fadeIn(delay: 120.ms),
 
                   const SizedBox(height: 20),
 
                   // Exchange card
                   _ExchangeCard(
-                    post: post, dark: dark,
-                    sv: sv, bd: bd, tp: tp, tl: tl,
+                    post: post,
+                    dark: dark,
+                    sv: sv,
+                    bd: bd,
+                    tp: tp,
+                    tl: tl,
                   ).animate().fadeIn(delay: 160.ms),
 
                   // Open Request banner
@@ -321,26 +258,36 @@ class PostDetailScreen extends StatelessWidget {
                         color: AppColors.warning.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: AppColors.warning.withOpacity(0.3)),
+                          color: AppColors.warning.withOpacity(0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.help_outline_rounded,
-                              color: AppColors.warning, size: 20),
+                          const Icon(
+                            Icons.help_outline_rounded,
+                            color: AppColors.warning,
+                            size: 20,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Open Request',
-                                    style: GoogleFonts.dmSans(
-                                        color: AppColors.warning,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13)),
                                 Text(
-                                    'Help request open to all campus members.',
-                                    style: GoogleFonts.dmSans(
-                                        color: ts, fontSize: 12)),
+                                  'Open Request',
+                                  style: GoogleFonts.dmSans(
+                                    color: AppColors.warning,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'Help request open to all campus members.',
+                                  style: GoogleFonts.dmSans(
+                                    color: ts,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -385,13 +332,12 @@ class _ExchangeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
-        color: sv,                                   // ← theme-aware surface
+        color: sv, // ← theme-aware surface
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: bd, width: 1),
       ),
       child: Column(
         children: [
-
           // Offering ⇌ Wants row
           Row(
             children: [
@@ -402,7 +348,9 @@ class _ExchangeCard extends StatelessWidget {
                   color: AppColors.primary,
                   label: 'Offering',
                   value: post.skillOffered,
-                  tp: tp, tl: tl, isRight: false,
+                  tp: tp,
+                  tl: tl,
+                  isRight: false,
                 ),
               ),
 
@@ -410,13 +358,17 @@ class _ExchangeCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Container(
-                  width: 38, height: 38,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(dark ? 0.18 : 0.10),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.swap_horiz_rounded,
-                      color: AppColors.primary, size: 20),
+                  child: const Icon(
+                    Icons.swap_horiz_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
               ),
 
@@ -431,7 +383,9 @@ class _ExchangeCard extends StatelessWidget {
                   value: isBarter
                       ? (post.skillWanted ?? 'Open')
                       : (post.customOffer ?? 'Custom'),
-                  tp: tp, tl: tl, isRight: true,
+                  tp: tp,
+                  tl: tl,
+                  isRight: true,
                 ),
               ),
             ],
@@ -445,13 +399,13 @@ class _ExchangeCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: rightColor.withOpacity(dark ? 0.14 : 0.09),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                  color: rightColor.withOpacity(0.25), width: 1),
+              border: Border.all(color: rightColor.withOpacity(0.25), width: 1),
             ),
             child: Text(
               isBarter ? '🔄  Barter Exchange' : '🎁  Custom Offer',
               style: GoogleFonts.dmSans(
-                fontSize: 12, fontWeight: FontWeight.w600,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
                 color: rightColor,
               ),
             ),
@@ -481,25 +435,37 @@ class _ExchangeSide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          isRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isRight
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(),
-            style: GoogleFonts.dmSans(
-                fontSize: 9.5, color: tl,
-                fontWeight: FontWeight.w700, letterSpacing: 0.6)),
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.dmSans(
+            fontSize: 9.5,
+            color: tl,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
         const SizedBox(height: 5),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: isRight
               ? [
                   Flexible(
-                      child: Text(value,
-                          style: GoogleFonts.dmSans(
-                              color: tp, fontWeight: FontWeight.w700,
-                              fontSize: 14),
-                          textAlign: TextAlign.end,
-                          maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    child: Text(
+                      value,
+                      style: GoogleFonts.dmSans(
+                        color: tp,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   const SizedBox(width: 5),
                   Icon(icon, color: color, size: 16),
                 ]
@@ -507,11 +473,17 @@ class _ExchangeSide extends StatelessWidget {
                   Icon(icon, color: color, size: 16),
                   const SizedBox(width: 5),
                   Flexible(
-                      child: Text(value,
-                          style: GoogleFonts.dmSans(
-                              color: tp, fontWeight: FontWeight.w700,
-                              fontSize: 14),
-                          maxLines: 2, overflow: TextOverflow.ellipsis)),
+                    child: Text(
+                      value,
+                      style: GoogleFonts.dmSans(
+                        color: tp,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
         ),
       ],
@@ -544,9 +516,14 @@ class _TagPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: c.withOpacity(0.3)),
       ),
-      child: Text(tag,
-          style: GoogleFonts.dmSans(
-              fontSize: 11, color: c, fontWeight: FontWeight.w600)),
+      child: Text(
+        tag,
+        style: GoogleFonts.dmSans(
+          fontSize: 11,
+          color: c,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

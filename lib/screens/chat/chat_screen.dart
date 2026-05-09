@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -6,9 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:record/record.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/chat_model.dart';
 import '../../services/auth_service.dart';
@@ -43,81 +40,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _msgCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   bool _isSending = false;
-  bool _isRecording = false;
   MessageModel? _replyTarget;
   String? _selectedMsgId;
-
-  // ── Voice recording ──────────────────────────────────────────
-  final AudioRecorder _recorder = AudioRecorder();
-  String? _recordingPath;
-  Timer? _recordTimer;
-  int _recordSeconds = 0;
-
-  Future<void> _startRecording() async {
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Microphone permission denied'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return;
-    }
-    final dir = await getTemporaryDirectory();
-    _recordingPath =
-        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000),
-      path: _recordingPath!,
-    );
-    _recordSeconds = 0;
-    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _recordSeconds++);
-    });
-    setState(() => _isRecording = true);
-  }
-
-  Future<void> _stopAndSendRecording() async {
-    _recordTimer?.cancel();
-    _recordTimer = null;
-    final path = await _recorder.stop();
-    setState(() {
-      _isRecording = false;
-      _recordSeconds = 0;
-    });
-    if (path == null || !mounted) return;
-    setState(() => _isSending = true);
-    final cs = context.read<ChatService>();
-    final url = await cs.uploadChatImage(File(path)); // reuse upload slot
-    if (url != null) {
-      await cs.sendMessage(
-        chatId: widget.chat.id,
-        imageUrl: url,
-        messageType: 'voice',
-      );
-      _scrollToBottom();
-    }
-    setState(() => _isSending = false);
-  }
-
-  Future<void> _cancelRecording() async {
-    _recordTimer?.cancel();
-    _recordTimer = null;
-    await _recorder.cancel();
-    setState(() {
-      _isRecording = false;
-      _recordSeconds = 0;
-    });
-  }
-
-  String get _recordDuration {
-    final m = _recordSeconds ~/ 60;
-    final s = _recordSeconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
 
   // ── theme shortcuts ──────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
@@ -154,8 +78,6 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
-    _recordTimer?.cancel();
-    _recorder.dispose();
     context.read<ChatService>().unsubscribeFromChat();
     super.dispose();
   }
@@ -293,7 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // Title
                 Row(
                   children: [
-                    const Text('📅', style: TextStyle(fontSize: 22)),
+                    const Text('🗓', style: TextStyle(fontSize: 22)),
                     const SizedBox(width: 8),
                     Text(
                       'Schedule Session',
@@ -528,12 +450,14 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
+                            color: const Color(0xFF4B4ACF),
                             borderRadius: BorderRadius.circular(14),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.35),
-                                blurRadius: 12,
+                                color: const Color(
+                                  0xFF4B4ACF,
+                                ).withOpacity(0.45),
+                                blurRadius: 14,
                                 offset: const Offset(0, 4),
                               ),
                             ],
@@ -1050,32 +974,176 @@ class _ChatScreenState extends State<ChatScreen> {
   // ── Delete message ───────────────────────────────────────────
   Future<void> _deleteMsg(MessageModel msg) async {
     _dismissOverlay();
+    final confirmed = await _showDeleteConfirmDialog(single: true);
+    if (!confirmed || !mounted) return;
     await context.read<ChatService>().deleteMessage(msg.id, widget.chat.id);
+  }
+
+  // ── Confirmation popup for delete ────────────────────────────
+  Future<bool> _showDeleteConfirmDialog({bool single = true}) async {
+    final d = Theme.of(context).brightness == Brightness.dark;
+    final bgClr = d ? const Color(0xFF1C1F2B) : Colors.white;
+    final labelClr = d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
+    final subClr = d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
+    final cancelBg = d ? const Color(0xFF262D3D) : const Color(0xFFF0EEFF);
+    final cancelBdr = d ? const Color(0xFF353B50) : const Color(0xFFDDD8FF);
+
+    return await showDialog<bool>(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.55),
+          builder: (dlgCtx) => Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: bgClr,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.30),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icon
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.red,
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Title
+                  Text(
+                    single ? 'Delete Message?' : 'Delete Messages?',
+                    style: GoogleFonts.dmSans(
+                      color: labelClr,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Subtitle
+                  Text(
+                    single
+                        ? 'This message will be permanently deleted and cannot be recovered.'
+                        : 'The selected messages will be permanently deleted and cannot be recovered.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.dmSans(
+                      color: subClr,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(dlgCtx, false),
+                          child: Container(
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: cancelBg,
+                              borderRadius: BorderRadius.circular(13),
+                              border: Border.all(color: cancelBdr, width: 1),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.dmSans(
+                                  color: labelClr,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(dlgCtx, true),
+                          child: Container(
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(13),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.red.withOpacity(0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Delete',
+                                style: GoogleFonts.dmSans(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ) ??
+        false;
   }
 
   @override
   Widget build(BuildContext context) {
     final myId = context.watch<AuthService>().currentUser?.id ?? '';
     final other = widget.chat.otherUser;
-    final swapDone =
-        widget.chat.swapStatus == 'completed' ||
-        widget.chat.swapStatus == 'cancelled';
-    final swapPending = widget.chat.swapStatus == 'pending';
-
     return GestureDetector(
       onTap: _selectedMsgId != null ? _dismissOverlay : null,
       child: Scaffold(
         backgroundColor: _bg,
         body: Column(
           children: [
-            // ── Gradient header ───────────────────────────────
+            // ── Gradient header (dark) / white (light) ─────────
             Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF5B4FD9), Color(0xFF7C6FE0)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
+              decoration: BoxDecoration(
+                gradient: _d
+                    ? const LinearGradient(
+                        colors: [Color(0xFF5B4FD9), Color(0xFF7C6FE0)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )
+                    : null,
+                color: _d ? null : Colors.white,
+                border: _d
+                    ? null
+                    : const Border(
+                        bottom: BorderSide(
+                          color: Color(0xFFE0DEEE),
+                          width: 0.8,
+                        ),
+                      ),
               ),
               child: SafeArea(
                 bottom: false,
@@ -1085,9 +1153,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       // Back
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
+                          color: _d ? Colors.white : const Color(0xFF0D0C1E),
                           size: 19,
                         ),
                         onPressed: () => Navigator.pop(context),
@@ -1131,7 +1199,9 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 other?.fullName ?? other?.username ?? 'User',
                                 style: GoogleFonts.dmSans(
-                                  color: Colors.white,
+                                  color: _d
+                                      ? Colors.white
+                                      : const Color(0xFF0D0C1E),
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
                                 ),
@@ -1141,7 +1211,9 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 '@${other?.username ?? ''}',
                                 style: GoogleFonts.dmSans(
-                                  color: Colors.white70,
+                                  color: _d
+                                      ? Colors.white70
+                                      : const Color(0xFF6B698A),
                                   fontSize: 11,
                                 ),
                               ),
@@ -1159,22 +1231,28 @@ class _ChatScreenState extends State<ChatScreen> {
                             vertical: 7,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
+                            color: _d
+                                ? Colors.white.withOpacity(0.15)
+                                : const Color(0xFF6C63FF).withOpacity(0.10),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.35),
+                              color: _d
+                                  ? Colors.white.withOpacity(0.35)
+                                  : const Color(0xFF6C63FF).withOpacity(0.45),
                               width: 1,
                             ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('📅', style: TextStyle(fontSize: 13)),
+                              const Text('🗓', style: TextStyle(fontSize: 13)),
                               const SizedBox(width: 5),
                               Text(
                                 'Schedule',
                                 style: GoogleFonts.dmSans(
-                                  color: Colors.white,
+                                  color: _d
+                                      ? Colors.white
+                                      : const Color(0xFF5B4FE8),
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1183,90 +1261,6 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                       ),
-                      // ── Confirm Swap (separate) ─────────────────────────
-                      if (!swapDone && !swapPending) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _confirmSwap,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.handshake_outlined,
-                                  color: Colors.white,
-                                  size: 13,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Confirm Swap',
-                                  style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ] else if (swapPending) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _completeSwap,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  color: Colors.white,
-                                  size: 13,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Complete',
-                                  style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -1468,6 +1462,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                   onPressed: _selectedIds.isEmpty
                                       ? null
                                       : () async {
+                                          final confirmed =
+                                              await _showDeleteConfirmDialog(
+                                                single:
+                                                    _selectedIds.length == 1,
+                                              );
+                                          if (!confirmed || !mounted) return;
                                           for (final id in _selectedIds) {
                                             await context
                                                 .read<ChatService>()
@@ -1504,8 +1504,6 @@ class _ChatScreenState extends State<ChatScreen> {
             _InputBar(
               controller: _msgCtrl,
               isSending: _isSending,
-              isRecording: _isRecording,
-              recordDuration: _recordDuration,
               replyTarget: _replyTarget,
               d: _d,
               sf: _sf,
@@ -1516,9 +1514,6 @@ class _ChatScreenState extends State<ChatScreen> {
               onCancelReply: () => setState(() => _replyTarget = null),
               onSend: _send,
               onPickImage: _pickImage,
-              onStartRecord: _startRecording,
-              onStopRecord: _stopAndSendRecording,
-              onCancelRecord: _cancelRecording,
             ),
           ],
         ),
@@ -2551,19 +2546,15 @@ class _VoiceNoteBubble extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _InputBar extends StatefulWidget {
   final TextEditingController controller;
-  final bool isSending, isRecording;
-  final String recordDuration;
+  final bool isSending;
   final MessageModel? replyTarget;
   final bool d;
   final Color sf, sv, bd, tp, ts;
   final VoidCallback onCancelReply, onSend, onPickImage;
-  final VoidCallback onStartRecord, onStopRecord, onCancelRecord;
 
   const _InputBar({
     required this.controller,
     required this.isSending,
-    required this.isRecording,
-    required this.recordDuration,
     required this.replyTarget,
     required this.d,
     required this.sf,
@@ -2574,28 +2565,13 @@ class _InputBar extends StatefulWidget {
     required this.onCancelReply,
     required this.onSend,
     required this.onPickImage,
-    required this.onStartRecord,
-    required this.onStopRecord,
-    required this.onCancelRecord,
   });
 
   @override
   State<_InputBar> createState() => _InputBarState();
 }
 
-class _InputBarState extends State<_InputBar>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseCtrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
-
+class _InputBarState extends State<_InputBar> {
   @override
   Widget build(BuildContext context) {
     final d = widget.d;
@@ -2681,86 +2657,48 @@ class _InputBarState extends State<_InputBar>
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Image icon inside the field — left
-                          if (!widget.isRecording)
-                            GestureDetector(
-                              onTap: widget.onPickImage,
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(
-                                  Icons.image_outlined,
-                                  color: iconClr,
-                                  size: 20,
-                                ),
+                          // Image icon — left
+                          GestureDetector(
+                            onTap: widget.onPickImage,
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Icon(
+                                Icons.image_outlined,
+                                color: iconClr,
+                                size: 20,
                               ),
                             ),
-
-                          // Text field OR recording indicator
-                          Expanded(
-                            child: widget.isRecording
-                                ? _RecordingIndicator(
-                                    duration: widget.recordDuration,
-                                    pulseCtrl: _pulseCtrl,
-                                    onCancel: widget.onCancelRecord,
-                                  )
-                                : TextField(
-                                    controller: widget.controller,
-                                    maxLines: 1,
-                                    textCapitalization:
-                                        TextCapitalization.sentences,
-                                    style: GoogleFonts.dmSans(
-                                      color: d
-                                          ? Colors.white
-                                          : const Color(0xFF0A0A0A),
-                                      fontSize: 14,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: 'Type a message...',
-                                      hintStyle: GoogleFonts.dmSans(
-                                        color: hintClr,
-                                        fontSize: 14,
-                                      ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      filled: false,
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 11,
-                                          ),
-                                    ),
-                                    onSubmitted: (_) => widget.onSend(),
-                                  ),
                           ),
-
-                          // Mic icon — right side inside rectangle
-                          if (!widget.isRecording)
-                            GestureDetector(
-                              onTap: widget.onStartRecord,
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(
-                                  Icons.mic_rounded,
+                          // Text field
+                          Expanded(
+                            child: TextField(
+                              controller: widget.controller,
+                              maxLines: 1,
+                              textCapitalization: TextCapitalization.sentences,
+                              style: GoogleFonts.dmSans(
+                                color: d
+                                    ? Colors.white
+                                    : const Color(0xFF0A0A0A),
+                                fontSize: 14,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Type a message...',
+                                hintStyle: GoogleFonts.dmSans(
                                   color: hintClr,
-                                  size: 20,
+                                  fontSize: 14,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 11,
                                 ),
                               ),
-                            )
-                          else ...[
-                            // Stop while recording
-                            GestureDetector(
-                              onTap: widget.onStopRecord,
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10),
-                                child: Icon(
-                                  Icons.stop_rounded,
-                                  color: Colors.red,
-                                  size: 20,
-                                ),
-                              ),
+                              onSubmitted: (_) => widget.onSend(),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
@@ -2768,13 +2706,9 @@ class _InputBarState extends State<_InputBar>
 
                   const SizedBox(width: 8),
 
-                  // ── Send rounded-square — outside the rectangle ───
+                  // ── Send rounded-square ───────────────────────────
                   GestureDetector(
-                    onTap: widget.isSending
-                        ? null
-                        : widget.isRecording
-                        ? widget.onStopRecord
-                        : widget.onSend,
+                    onTap: widget.isSending ? null : widget.onSend,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: 44,
@@ -2805,15 +2739,10 @@ class _InputBarState extends State<_InputBar>
                                 ),
                               ),
                             )
-                          : Transform.rotate(
-                              angle: 0,
-                              child: Icon(
-                                widget.isRecording
-                                    ? Icons.check_rounded
-                                    : Icons.send_rounded,
-                                color: Colors.white,
-                                size: 19,
-                              ),
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 19,
                             ),
                     ),
                   ),
@@ -2823,87 +2752,6 @@ class _InputBarState extends State<_InputBar>
           ],
         ),
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Recording indicator row (shown instead of text field while recording)
-// ─────────────────────────────────────────────────────────────────────────────
-class _RecordingIndicator extends StatelessWidget {
-  final String duration;
-  final AnimationController pulseCtrl;
-  final VoidCallback onCancel;
-
-  const _RecordingIndicator({
-    required this.duration,
-    required this.pulseCtrl,
-    required this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // Pulsing red dot
-        AnimatedBuilder(
-          animation: pulseCtrl,
-          builder: (_, __) => Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.4 + 0.6 * pulseCtrl.value),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          duration,
-          style: GoogleFonts.dmSans(
-            color: Colors.red,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 8),
-        // Mini waveform animation
-        AnimatedBuilder(
-          animation: pulseCtrl,
-          builder: (_, __) => Row(
-            children: List.generate(6, (i) {
-              final h =
-                  4.0 +
-                  10.0 *
-                      ((math.sin(pulseCtrl.value * math.pi * 2 + i) + 1) / 2);
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                width: 3,
-                height: h,
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
-            }),
-          ),
-        ),
-        const Spacer(),
-        // Cancel (swipe left icon)
-        GestureDetector(
-          onTap: onCancel,
-          child: Row(
-            children: [
-              const Icon(Icons.close_rounded, color: Colors.red, size: 16),
-              const SizedBox(width: 2),
-              Text(
-                'Cancel',
-                style: GoogleFonts.dmSans(color: Colors.red, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

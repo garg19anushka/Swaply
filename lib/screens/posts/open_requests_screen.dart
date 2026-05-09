@@ -24,12 +24,12 @@ class OpenRequestsScreen extends StatefulWidget {
 class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
   // ── theme shortcuts ──────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
-  Color get _bg => _d ? const Color(0xFF111318) : Colors.white;
+  Color get _bg => _d ? const Color(0xFF0D0E17) : const Color(0xFFF4F4FB);
   Color get _sf => _d ? const Color(0xFF1A1D24) : Colors.white;
-  Color get _bd => _d ? const Color(0xFF2A2D36) : const Color(0xFFEFEFEF);
-  Color get _tp => _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
-  Color get _ts => _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
-  Color get _tl => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
+  Color get _bd => _d ? const Color(0xFF2A2D36) : const Color(0xFFDDDCF0);
+  Color get _tp => _d ? const Color(0xFFF2F2F4) : const Color(0xFF0D0C1E);
+  Color get _ts => _d ? const Color(0xFF8E9099) : const Color(0xFF6B698A);
+  Color get _tl => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAC);
 
   @override
   void initState() {
@@ -46,34 +46,44 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // ── Neutral sticky app bar ──────────────────────────────────
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: _sf,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            surfaceTintColor: Colors.transparent,
-            leading: IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: _tp,
-                size: 19,
+          // ── Gradient header matching Create Swap Post ───────────────
+          SliverToBoxAdapter(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF5B4FE8), Color(0xFF7B6FF0)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              'Open Requests',
-              style: GoogleFonts.dmSans(
-                color: _tp,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.4,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top,
+                left: 4,
+                right: 16,
+                bottom: 18,
               ),
-            ),
-            centerTitle: false,
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Divider(height: 1, thickness: 1, color: _bd),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  Text(
+                    'Open Requests',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
