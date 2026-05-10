@@ -4,8 +4,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../models/post_model.dart';
+import '../../models/swap_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/post_service.dart';
+import '../../services/swap_service.dart';
+import '../../services/ai_match_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/shimmer_card.dart';
@@ -15,12 +18,13 @@ import '../posts/post_detail_screen.dart';
 import '../posts/open_requests_screen.dart';
 import '../posts/create_post_screen.dart';
 import '../profile/user_profile_screen.dart';
+import '../swaps/all_swaps_screen.dart';
 import '../../widgets/chatbot_widget.dart';
-import 'package:Swaply/widgets/swap_post_card.dart';
+
 typedef TabSwitchCallback = void Function(int index);
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Category data
+//  Categories
 // ─────────────────────────────────────────────────────────────────────────────
 class _Cat {
   final String label;
@@ -73,8 +77,37 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => context.read<PostService>().fetchPosts(),
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<PostService>().fetchPosts();
+      await context.read<SwapService>().fetchActiveSwaps();
+      _triggerAiMatches();
+    });
+  }
+
+  // ── AI match: derive skills from user's OWN posts, not ProfileModel ───────
+  void _triggerAiMatches() {
+    final auth = context.read<AuthService>();
+    final allPosts = context.read<PostService>().posts;
+    final myId = auth.currentUser?.id ?? '';
+    final campus = auth.currentProfile?.campus ?? 'Campus';
+    if (allPosts.isEmpty) return;
+
+    // Find what the current user offers/wants from their own posts
+    final myPosts = allPosts.where((p) => p.userId == myId).toList();
+    final mySkillOffered = myPosts.isNotEmpty
+        ? myPosts.first.skillOffered
+        : auth.currentProfile?.username ?? 'General';
+    final mySkillWanted = myPosts.isNotEmpty
+        ? (myPosts.first.skillWanted ?? 'Any skill')
+        : 'Any skill';
+
+    context.read<AiMatchService>().fetchMatches(
+      mySkillOffered: mySkillOffered,
+      mySkillWanted: mySkillWanted,
+      myCampus: campus,
+      myUserId: myId,
+      allPosts: allPosts,
+      maxResults: 5,
     );
   }
 
@@ -174,7 +207,7 @@ class _FeedScreenState extends State<FeedScreen> {
             controller: _scrollCtrl,
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // ── Pinned header shell ──────────────────────────────────
+              // ── Pinned header shell ──────────────────────────────
               SliverAppBar(
                 pinned: true,
                 floating: false,
@@ -187,7 +220,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 automaticallyImplyLeading: false,
               ),
 
-              // ── Non-sticky header ────────────────────────────────────
+              // ── Non-sticky header ────────────────────────────────
               SliverToBoxAdapter(
                 child: Container(
                   color: _sf,
@@ -200,7 +233,6 @@ class _FeedScreenState extends State<FeedScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
                                 child: Column(
@@ -280,7 +312,6 @@ class _FeedScreenState extends State<FeedScreen> {
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                       color: AppColors.warning.withOpacity(0.3),
-                                      width: 1,
                                     ),
                                   ),
                                   child: Row(
@@ -418,7 +449,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                         ).animate().fadeIn(delay: 80.ms),
 
-                        // ── HERO CARD ──────────────────────────────────
+                        // Hero card
                         const SizedBox(height: 12),
                         HomeHeroCard(
                           onBrowse: () => widget.onSwitchTab?.call(1),
@@ -426,8 +457,6 @@ class _FeedScreenState extends State<FeedScreen> {
                           matchCount: 3,
                           activeSwaps: 24,
                         ),
-
-                        // ──────────────────────────────────────────────
                         const SizedBox(height: 8),
                         Divider(height: 1, thickness: 1, color: _bd),
                       ],
@@ -436,16 +465,120 @@ class _FeedScreenState extends State<FeedScreen> {
                 ),
               ),
 
-              // ══════════════════════════════════════════════════════════
-              //  MAIN FEED — real Supabase data, new card design
-              //  Featured swap section REMOVED as requested
-              // ══════════════════════════════════════════════════════════
+              // ══════════════════════════════════════════════════════
+              //  ACTIVE SWAP  – real SwapService data
+              // ══════════════════════════════════════════════════════
+              SliverToBoxAdapter(
+                child: Consumer<SwapService>(
+                  builder: (_, ss, __) {
+                    if (ss.activeSwaps.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    final swap = ss.activeSwaps.first;
+                    return Column(
+                      children: [
+                        _SectionHeader(
+                          title: '🔄  Active Swap',
+                          actionLabel: 'View all',
+                          onAction: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AllSwapsScreen(),
+                            ),
+                          ),
+                          dark: _d,
+                          tp: _tp,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _ActiveSwapCard(swap: swap, dark: _d),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                    ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.05);
+                  },
+                ),
+              ),
+
+              // ══════════════════════════════════════════════════════
+              //  AI SMART MATCHES  – real AiMatchService data
+              // ══════════════════════════════════════════════════════
+              SliverToBoxAdapter(
+                child: Consumer<AiMatchService>(
+                  builder: (_, ai, __) {
+                    if (ai.isLoading) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionHeader(
+                            title: '✨  Smart Matches',
+                            actionLabel: 'See all',
+                            onAction: () => widget.onSwitchTab?.call(1),
+                            dark: _d,
+                            tp: _tp,
+                          ),
+                          SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                              itemCount: 3,
+                              itemBuilder: (_, __) =>
+                                  _MatchCardSkeleton(dark: _d),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      );
+                    }
+                    if (!ai.hasMatches) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _SectionHeader(
+                          title: '✨  Smart Matches',
+                          actionLabel: 'See all',
+                          onAction: () => widget.onSwitchTab?.call(1),
+                          dark: _d,
+                          tp: _tp,
+                        ),
+                        SizedBox(
+                          height: 220,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                            itemCount: ai.matches.length,
+                            itemBuilder: (_, i) =>
+                                _MatchCard(
+                                      result: ai.matches[i],
+                                      dark: _d,
+                                      onTap: () =>
+                                          _openPostDetail(ai.matches[i].post),
+                                    )
+                                    .animate()
+                                    .fadeIn(
+                                      delay: Duration(milliseconds: i * 80),
+                                    )
+                                    .slideX(begin: 0.1),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    );
+                  },
+                ),
+              ),
+
+              // ══════════════════════════════════════════════════════
+              //  RECENT SKILLS  – real PostService data
+              // ══════════════════════════════════════════════════════
               Consumer<PostService>(
                 builder: (_, ps, __) {
                   if (ps.isLoading && ps.posts.isEmpty) {
                     return SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                         child: Column(
                           children: List.generate(
                             3,
@@ -455,7 +588,6 @@ class _FeedScreenState extends State<FeedScreen> {
                       ),
                     );
                   }
-
                   if (ps.posts.isEmpty) {
                     return SliverFillRemaining(child: _empty());
                   }
@@ -464,38 +596,13 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Section heading
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Recent Skills',
-                                  style: GoogleFonts.dmSans(
-                                    color: _tp,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => widget.onSwitchTab?.call(1),
-                                child: Text(
-                                  'See all',
-                                  style: GoogleFonts.dmSans(
-                                    color: AppColors.primary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(),
-
-                        // All posts using new SwapPostCard
+                        _SectionHeader(
+                          title: 'Recent Skills',
+                          actionLabel: 'See all',
+                          onAction: () => widget.onSwitchTab?.call(1),
+                          dark: _d,
+                          tp: _tp,
+                        ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           child: Column(
@@ -529,13 +636,13 @@ class _FeedScreenState extends State<FeedScreen> {
                                           .animate()
                                           .fadeIn(
                                             delay: Duration(
-                                              milliseconds: e.key * 60,
+                                              milliseconds: e.key * 55,
                                             ),
                                           )
                                           .slideY(
                                             begin: 0.06,
                                             delay: Duration(
-                                              milliseconds: e.key * 60,
+                                              milliseconds: e.key * 55,
                                             ),
                                             curve: Curves.easeOutCubic,
                                           ),
@@ -543,7 +650,6 @@ class _FeedScreenState extends State<FeedScreen> {
                                 .toList(),
                           ),
                         ),
-
                         const SizedBox(height: 100),
                       ],
                     ),
@@ -553,52 +659,650 @@ class _FeedScreenState extends State<FeedScreen> {
             ],
           ),
 
-          // Chatbot FAB
           Positioned(bottom: 20, right: 20, child: const ChatbotFab()),
         ],
       ),
     );
   }
 
-  Widget _empty() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.swap_horiz_rounded,
-              size: 44,
-              color: AppColors.primary,
-            ),
+  Widget _empty() => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.08),
+            shape: BoxShape.circle,
           ),
-          const SizedBox(height: 18),
-          Text(
-            'No posts yet',
-            style: GoogleFonts.dmSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: _tp,
+          child: const Icon(
+            Icons.swap_horiz_rounded,
+            size: 44,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'No posts yet',
+          style: GoogleFonts.dmSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: _tp,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Be the first to post a skill swap!',
+          style: GoogleFonts.dmSans(color: _ts, fontSize: 14),
+        ),
+      ],
+    ).animate().fadeIn(),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Active Swap Card
+// ─────────────────────────────────────────────────────────────────────────────
+class _ActiveSwapCard extends StatelessWidget {
+  final SwapModel swap;
+  final bool dark;
+  const _ActiveSwapCard({required this.swap, required this.dark});
+
+  Color get _cardBg => dark ? const Color(0xFF111126) : Colors.white;
+  Color get _cardBorder => dark ? const Color(0xFF252540) : AppColors.border;
+  Color get _tp => dark ? const Color(0xFFF0F0FF) : AppColors.textPrimary;
+  Color get _ts => dark ? const Color(0xFF9090B0) : AppColors.textSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (swap.progress * 100).round();
+    final partnerFirst =
+        swap.partnerName?.split(' ').first ?? swap.partnerUsername ?? 'Partner';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cardBorder),
+        boxShadow: dark
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 18,
+                  offset: const Offset(0, 5),
+                ),
+              ]
+            : AppShadows.card,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              swap.swapTitle,
+              style: GoogleFonts.dmSans(
+                color: _tp,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
             ),
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    swap.progressLabel,
+                    style: GoogleFonts.dmSans(color: _ts, fontSize: 12),
+                  ),
+                ),
+                Text(
+                  '$pct%',
+                  style: GoogleFonts.dmSans(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+
+            // Gradient progress bar
+            Container(
+              height: 6,
+              decoration: BoxDecoration(
+                color: dark ? const Color(0xFF2A2A3E) : const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: swap.progress.clamp(0.0, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00E5FF), Color(0xFF7C5CFC)],
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Session dots
+            Row(
+              children: List.generate(swap.totalSessions, (i) {
+                final done = i < swap.doneSessions;
+                final active = i == swap.doneSessions;
+                Color c;
+                if (done)
+                  c = AppColors.accentTeal;
+                else if (active)
+                  c = AppColors.primary;
+                else
+                  c = dark ? const Color(0xFF2A2A3E) : const Color(0xFFEEEEEE);
+                return Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(
+                      right: i < swap.totalSessions - 1 ? 5 : 0,
+                    ),
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: c,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 14),
+
+            Row(
+              children: [
+                const Text('📅', style: TextStyle(fontSize: 12)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    swap.nextSessionLabel,
+                    style: GoogleFonts.dmSans(color: _ts, fontSize: 12),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _showRateSheet(context, partnerFirst),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppColors.accentTeal.withOpacity(0.5),
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      color: AppColors.accentTeal.withOpacity(0.08),
+                    ),
+                    child: Text(
+                      'Rate $partnerFirst ★',
+                      style: GoogleFonts.dmSans(
+                        color: AppColors.accentTeal,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRateSheet(BuildContext context, String name) {
+    int stars = 0;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSt) => Container(
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF111126) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Be the first to post a skill swap!',
-            style: GoogleFonts.dmSans(color: _ts, fontSize: 14),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 36),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Rate $name',
+                style: GoogleFonts.dmSans(
+                  color: dark ? Colors.white : AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'How was your session?',
+                style: GoogleFonts.dmSans(
+                  color: dark ? Colors.white54 : AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  5,
+                  (i) => GestureDetector(
+                    onTap: () => setSt(() => stars = i + 1),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(
+                        i < stars
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        size: 36,
+                        color: i < stars
+                            ? const Color(0xFFFFBE0B)
+                            : Colors.grey.withOpacity(0.4),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Rating submitted! ⭐',
+                        style: GoogleFonts.dmSans(),
+                      ),
+                      backgroundColor: AppColors.primary,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    'Submit Rating',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ).animate().fadeIn(),
+        ),
+      ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SwapPostCard  –  matches screenshot exactly, uses real PostModel fields
+//  AI Match Card
+// ─────────────────────────────────────────────────────────────────────────────
+class _MatchCard extends StatelessWidget {
+  final AiMatchResult result;
+  final bool dark;
+  final VoidCallback onTap;
+  const _MatchCard({
+    required this.result,
+    required this.dark,
+    required this.onTap,
+  });
+
+  static const _grads = [
+    [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
+    [Color(0xFF00C9A7), Color(0xFF4CC9F0)],
+    [Color(0xFFFFBE0B), Color(0xFFFF6B35)],
+    [Color(0xFF6C47FF), Color(0xFF00C9A7)],
+    [Color(0xFFFF4D6D), Color(0xFFFF9F43)],
+  ];
+
+  String get _initials {
+    final name =
+        result.post.profile?.fullName ?? result.post.profile?.username ?? '?';
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
+  }
+
+  List<Color> get _grad =>
+      _grads[_initials.isEmpty ? 0 : _initials.codeUnitAt(0) % _grads.length];
+
+  Color get _cardBg => dark ? const Color(0xFF111126) : Colors.white;
+  Color get _border => dark ? const Color(0xFF252540) : AppColors.border;
+  Color get _tp => dark ? const Color(0xFFF0F0FF) : AppColors.textPrimary;
+  Color get _ts => dark ? const Color(0xFF9090B0) : AppColors.textSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    final post = result.post;
+    final campus = post.profile?.campus ?? 'Campus';
+    final partnerName =
+        post.profile?.fullName?.split(' ').first ??
+        post.profile?.username ??
+        'User';
+    final score = result.matchScore;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 148,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: _cardBg,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _border),
+          boxShadow: dark
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.28),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : AppShadows.card,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avatar
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _grad,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Center(
+                  child: Text(
+                    _initials,
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              Text(
+                partnerName,
+                style: GoogleFonts.dmSans(
+                  color: _tp,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+
+              Text(
+                campus,
+                style: GoogleFonts.dmSans(color: _ts, fontSize: 11),
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+
+              // Skill pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF4D6D).withOpacity(0.13),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFFFF4D6D).withOpacity(0.35),
+                  ),
+                ),
+                child: Text(
+                  post.skillOffered.length > 12
+                      ? '${post.skillOffered.substring(0, 12)}…'
+                      : post.skillOffered,
+                  style: GoogleFonts.dmSans(
+                    color: dark
+                        ? const Color(0xFFFF7A9A)
+                        : const Color(0xFFCC2244),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Match score
+              Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 12,
+                    color: Color(0xFF00C9A7),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$score% match',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF00C9A7),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+
+              // Match bar
+              Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  color: dark
+                      ? const Color(0xFF2A2A3E)
+                      : const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: score / 100,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00E5FF), Color(0xFF7C5CFC)],
+                      ),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Skeleton while AI loads
+// ─────────────────────────────────────────────────────────────────────────────
+class _MatchCardSkeleton extends StatelessWidget {
+  final bool dark;
+  const _MatchCardSkeleton({required this.dark});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = dark ? const Color(0xFF1E1E38) : const Color(0xFFEEEEEE);
+    return Container(
+          width: 148,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF111126) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: dark ? const Color(0xFF252540) : AppColors.border,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  height: 12,
+                  width: 90,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  height: 10,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  height: 24,
+                  width: 70,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  height: 10,
+                  width: 80,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        )
+        .animate(onPlay: (c) => c.repeat())
+        .shimmer(
+          duration: 1200.ms,
+          color: dark ? Colors.white10 : Colors.black12,
+        );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Section header
+// ─────────────────────────────────────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String actionLabel;
+  final VoidCallback onAction;
+  final bool dark;
+  final Color tp;
+  const _SectionHeader({
+    required this.title,
+    required this.actionLabel,
+    required this.onAction,
+    required this.dark,
+    required this.tp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: GoogleFonts.dmSans(
+                color: tp,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onAction,
+            child: Text(
+              actionLabel,
+              style: GoogleFonts.dmSans(
+                color: AppColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  SwapPostCard – full post card
 // ─────────────────────────────────────────────────────────────────────────────
 class SwapPostCard extends StatefulWidget {
   final PostModel post;
@@ -659,16 +1363,14 @@ class _SwapPostCardState extends State<SwapPostCard>
     _likeCtrl.reverse().then((_) => _likeCtrl.forward());
   }
 
-  // ── Theme ──────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
   Color get _cardBg => _d ? const Color(0xFF111126) : Colors.white;
   Color get _cardBorder => _d ? const Color(0xFF252540) : AppColors.border;
   Color get _tp => _d ? const Color(0xFFF0F0FF) : AppColors.textPrimary;
   Color get _ts => _d ? const Color(0xFF9090B0) : AppColors.textSecondary;
   Color get _tl => _d ? const Color(0xFF555575) : AppColors.textLight;
-  Color get _divider => _d ? const Color(0xFF1E1E38) : const Color(0xFFEEEEEE);
+  Color get _div => _d ? const Color(0xFF1E1E38) : const Color(0xFFEEEEEE);
 
-  // ── Avatar gradient, deterministic per first initial ───────
   static const _grads = [
     [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
     [Color(0xFF00C9A7), Color(0xFF4CC9F0)],
@@ -701,19 +1403,17 @@ class _SwapPostCardState extends State<SwapPostCard>
     return '${diff.inDays}d ago';
   }
 
-  // Post expires 7 days after creation
   int get _daysLeft {
     final expiry = widget.post.createdAt.add(const Duration(days: 7));
     return expiry.difference(DateTime.now()).inDays.clamp(0, 99);
   }
 
-  // "Available now" if posted within last 24 h
-  bool get _isAvailableNow =>
+  bool get _isAvailable =>
       DateTime.now().difference(widget.post.createdAt).inHours < 24;
 
   String get _availLabel {
-    if (_isAvailableNow) return 'Available now';
-    final days = [
+    if (_isAvailable) return 'Available now';
+    const days = [
       'Monday',
       'Tuesday',
       'Wednesday',
@@ -722,15 +1422,14 @@ class _SwapPostCardState extends State<SwapPostCard>
       'Saturday',
       'Sunday',
     ];
-    final next = DateTime.now().add(const Duration(days: 2));
-    return 'Busy till ${days[next.weekday - 1]}';
+    return 'Busy till ${days[DateTime.now().add(const Duration(days: 2)).weekday - 1]}';
   }
 
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
     final rating = post.profile?.averageRating ?? 0.0;
-    final campus = (post.profile?.campus?.isNotEmpty == true)
+    final campus = post.profile?.campus?.isNotEmpty == true
         ? post.profile!.campus!
         : 'MRU';
     final swapCount = post.bookmarksCount;
@@ -758,17 +1457,13 @@ class _SwapPostCardState extends State<SwapPostCard>
           onTap: widget.onSwap,
           borderRadius: BorderRadius.circular(18),
           splashColor: AppColors.primary.withOpacity(0.06),
-          highlightColor: AppColors.primary.withOpacity(0.03),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── HEADER ──────────────────────────────────────────
                 _buildHeader(post, rating, campus),
                 const SizedBox(height: 14),
-
-                // ── TITLE ────────────────────────────────────────────
                 Text(
                   post.title,
                   style: GoogleFonts.dmSans(
@@ -780,8 +1475,6 @@ class _SwapPostCardState extends State<SwapPostCard>
                   ),
                 ),
                 const SizedBox(height: 7),
-
-                // ── DESCRIPTION ──────────────────────────────────────
                 Text(
                   post.description,
                   maxLines: 2,
@@ -790,36 +1483,24 @@ class _SwapPostCardState extends State<SwapPostCard>
                     color: _ts,
                     fontSize: 13.5,
                     height: 1.5,
-                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 const SizedBox(height: 13),
-
-                // ── SKILL PILLS (coral) ───────────────────────────────
                 _buildSkillPills(post),
                 const SizedBox(height: 11),
-
-                // ── WANTS LINE ────────────────────────────────────────
                 if (post.skillWanted != null &&
                     post.skillWanted!.trim().isNotEmpty) ...[
                   _buildWantsLine(post.skillWanted!),
                   const SizedBox(height: 11),
                 ],
-
-                // ── STATUS ROW ────────────────────────────────────────
                 _buildStatusRow(swapCount),
-
-                // ── EXPIRY ────────────────────────────────────────────
                 if (_daysLeft <= 7) ...[
                   const SizedBox(height: 9),
                   _buildExpiry(),
                 ],
-
                 const SizedBox(height: 12),
-                Divider(height: 1, color: _divider),
+                Divider(height: 1, color: _div),
                 const SizedBox(height: 10),
-
-                // ── ACTIONS ───────────────────────────────────────────
                 _buildActions(),
               ],
             ),
@@ -831,7 +1512,6 @@ class _SwapPostCardState extends State<SwapPostCard>
 
   Widget _buildHeader(PostModel post, double rating, String campus) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onTap: widget.onTapAuthor,
@@ -871,7 +1551,6 @@ class _SwapPostCardState extends State<SwapPostCard>
                     color: _tp,
                     fontSize: 14.5,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.1,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -910,7 +1589,6 @@ class _SwapPostCardState extends State<SwapPostCard>
             ),
           ),
         ),
-        // Campus badge – grey pill
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
           decoration: BoxDecoration(
@@ -945,13 +1623,12 @@ class _SwapPostCardState extends State<SwapPostCard>
     );
   }
 
-  Widget _buildWantsLine(String skillWanted) {
-    final parts = skillWanted
+  Widget _buildWantsLine(String sw) {
+    final parts = sw
         .split(RegExp(r'[,/&]|\band\b', caseSensitive: false))
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
-
     return Row(
       children: [
         Text(
@@ -966,7 +1643,7 @@ class _SwapPostCardState extends State<SwapPostCard>
           child: Text(
             parts.join(' · '),
             style: GoogleFonts.dmSans(
-              color: const Color(0xFF4CC9F0), // cyan, matches screenshot
+              color: const Color(0xFF4CC9F0),
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -983,12 +1660,12 @@ class _SwapPostCardState extends State<SwapPostCard>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: _isAvailableNow
+            color: _isAvailable
                 ? const Color(0xFF00C9A7).withOpacity(0.12)
                 : const Color(0xFFFFBE0B).withOpacity(0.12),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: _isAvailableNow
+              color: _isAvailable
                   ? const Color(0xFF00C9A7).withOpacity(0.35)
                   : const Color(0xFFFFBE0B).withOpacity(0.35),
             ),
@@ -1000,7 +1677,7 @@ class _SwapPostCardState extends State<SwapPostCard>
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: _isAvailableNow
+                  color: _isAvailable
                       ? const Color(0xFF00C9A7)
                       : const Color(0xFFFFBE0B),
                   shape: BoxShape.circle,
@@ -1010,7 +1687,7 @@ class _SwapPostCardState extends State<SwapPostCard>
               Text(
                 _availLabel,
                 style: GoogleFonts.dmSans(
-                  color: _isAvailableNow
+                  color: _isAvailable
                       ? const Color(0xFF00C9A7)
                       : const Color(0xFFFFBE0B),
                   fontSize: 11.5,
@@ -1041,69 +1718,43 @@ class _SwapPostCardState extends State<SwapPostCard>
     );
   }
 
-  Widget _buildExpiry() {
-    return Row(
-      children: [
-        const Text('⏳', style: TextStyle(fontSize: 12)),
-        const SizedBox(width: 5),
-        Text(
-          _daysLeft == 0
-              ? 'Expires today!'
-              : 'Expires in $_daysLeft day${_daysLeft == 1 ? '' : 's'}',
-          style: GoogleFonts.dmSans(
-            color: const Color(0xFFFFBE0B),
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-          ),
+  Widget _buildExpiry() => Row(
+    children: [
+      const Text('⏳', style: TextStyle(fontSize: 12)),
+      const SizedBox(width: 5),
+      Text(
+        _daysLeft == 0
+            ? 'Expires today!'
+            : 'Expires in $_daysLeft day${_daysLeft == 1 ? '' : 's'}',
+        style: GoogleFonts.dmSans(
+          color: const Color(0xFFFFBE0B),
+          fontSize: 12.5,
+          fontWeight: FontWeight.w600,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 
-  Widget _buildActions() {
-    return Row(
-      children: [
-        // Like button with bounce animation
-        ScaleTransition(
-          scale: _likeScale,
-          child: GestureDetector(
-            onTap: _toggleLike,
-            child: Row(
-              children: [
-                Icon(
-                  _liked
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_outline_rounded,
-                  size: 20,
-                  color: _liked ? AppColors.secondary : _tl,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$_likeCount',
-                  style: GoogleFonts.dmSans(
-                    color: _liked ? AppColors.secondary : _tl,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(width: 16),
-
-        // Comment
-        GestureDetector(
-          onTap: widget.onSwap,
+  Widget _buildActions() => Row(
+    children: [
+      ScaleTransition(
+        scale: _likeScale,
+        child: GestureDetector(
+          onTap: _toggleLike,
           child: Row(
             children: [
-              Icon(Icons.chat_bubble_outline_rounded, size: 19, color: _tl),
+              Icon(
+                _liked
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_outline_rounded,
+                size: 20,
+                color: _liked ? AppColors.secondary : _tl,
+              ),
               const SizedBox(width: 4),
               Text(
-                '${(_likeCount * 0.25).round()}',
+                '$_likeCount',
                 style: GoogleFonts.dmSans(
-                  color: _tl,
+                  color: _liked ? AppColors.secondary : _tl,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1111,73 +1762,82 @@ class _SwapPostCardState extends State<SwapPostCard>
             ],
           ),
         ),
-
-        const SizedBox(width: 14),
-
-        // Bookmark
-        GestureDetector(
-          onTap: widget.onBookmark,
-          child: Icon(
-            widget.post.isBookmarked
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_outline_rounded,
-            size: 20,
-            color: widget.post.isBookmarked ? AppColors.primary : _tl,
-          ),
-        ),
-
-        const Spacer(),
-
-        // Own post: edit + delete buttons
-        if (widget.isOwn) ...[
-          _SmallBtn(
-            icon: Icons.edit_outlined,
-            color: AppColors.primary,
-            onTap: widget.onEdit ?? () {},
-          ),
-          const SizedBox(width: 8),
-          _SmallBtn(
-            icon: Icons.delete_outline_rounded,
-            color: AppColors.error,
-            onTap: widget.onDelete ?? () {},
-          ),
-          const SizedBox(width: 10),
-        ],
-
-        // Swap → gradient pill
-        GestureDetector(
-          onTap: widget.onSwap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7C5CFC).withOpacity(0.38),
-                  blurRadius: 16,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Text(
-              'Swap →',
+      ),
+      const SizedBox(width: 16),
+      GestureDetector(
+        onTap: widget.onSwap,
+        child: Row(
+          children: [
+            Icon(Icons.chat_bubble_outline_rounded, size: 19, color: _tl),
+            const SizedBox(width: 4),
+            Text(
+              '${(_likeCount * 0.25).round()}',
               style: GoogleFonts.dmSans(
-                color: Colors.white,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.1,
+                color: _tl,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(width: 14),
+      GestureDetector(
+        onTap: widget.onBookmark,
+        child: Icon(
+          widget.post.isBookmarked
+              ? Icons.bookmark_rounded
+              : Icons.bookmark_outline_rounded,
+          size: 20,
+          color: widget.post.isBookmarked ? AppColors.primary : _tl,
+        ),
+      ),
+      const Spacer(),
+      if (widget.isOwn) ...[
+        _SmallBtn(
+          icon: Icons.edit_outlined,
+          color: AppColors.primary,
+          onTap: widget.onEdit ?? () {},
+        ),
+        const SizedBox(width: 8),
+        _SmallBtn(
+          icon: Icons.delete_outline_rounded,
+          color: AppColors.error,
+          onTap: widget.onDelete ?? () {},
+        ),
+        const SizedBox(width: 10),
+      ],
+      GestureDetector(
+        onTap: widget.onSwap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF7C5CFC).withOpacity(0.38),
+                blurRadius: 16,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Text(
+            'Swap →',
+            style: GoogleFonts.dmSans(
+              color: Colors.white,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 
   Widget _dot() => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -1186,7 +1846,7 @@ class _SwapPostCardState extends State<SwapPostCard>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Coral skill pill
+//  Small reusable widgets
 // ─────────────────────────────────────────────────────────────────────────────
 class _SkillPill extends StatelessWidget {
   final String label;
@@ -1218,9 +1878,6 @@ class _SkillPill extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Small edit / delete button for own posts
-// ─────────────────────────────────────────────────────────────────────────────
 class _SmallBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -1249,9 +1906,6 @@ class _SmallBtn extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Category chip
-// ─────────────────────────────────────────────────────────────────────────────
 class _CatChip extends StatelessWidget {
   final _Cat cat;
   final bool active;
@@ -1324,9 +1978,6 @@ class _CatChip extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Header icon button
-// ─────────────────────────────────────────────────────────────────────────────
 class _IconBtn extends StatelessWidget {
   final IconData icon;
   final bool d;

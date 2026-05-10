@@ -14,7 +14,7 @@ import '../posts/create_post_screen.dart';
 import '../profile/user_profile_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Category chip data  (12 items matching Home Page)
+//  Category chip data
 // ─────────────────────────────────────────────────────────────────────────────
 class _Cat {
   final String label;
@@ -23,22 +23,22 @@ class _Cat {
 }
 
 const _cats = [
-  _Cat('Design',   Icons.palette_outlined),
-  _Cat('Coding',   Icons.code_rounded),
-  _Cat('Music',    Icons.music_note_rounded),
-  _Cat('Writing',  Icons.edit_note_rounded),
-  _Cat('Math',     Icons.calculate_outlined),
+  _Cat('Design', Icons.palette_outlined),
+  _Cat('Coding', Icons.code_rounded),
+  _Cat('Music', Icons.music_note_rounded),
+  _Cat('Writing', Icons.edit_note_rounded),
+  _Cat('Math', Icons.calculate_outlined),
   _Cat('Language', Icons.translate_rounded),
-  _Cat('Photo',    Icons.camera_alt_outlined),
-  _Cat('Cooking',  Icons.restaurant_outlined),
-  _Cat('Fitness',  Icons.fitness_center_rounded),
-  _Cat('Finance',  Icons.attach_money_rounded),
+  _Cat('Photo', Icons.camera_alt_outlined),
+  _Cat('Cooking', Icons.restaurant_outlined),
+  _Cat('Fitness', Icons.fitness_center_rounded),
+  _Cat('Finance', Icons.attach_money_rounded),
   _Cat('Business', Icons.business_center_outlined),
-  _Cat('DIY',      Icons.handyman_outlined),
+  _Cat('DIY', Icons.handyman_outlined),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Deterministic pastel card gradients
+//  Deterministic pastel gradients for grid cards
 // ─────────────────────────────────────────────────────────────────────────────
 const _cardGrads = [
   [Color(0xFFBBDEFB), Color(0xFF90CAF9)],
@@ -54,12 +54,6 @@ List<Color> _gradFor(PostModel p) =>
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  ExploreScreen
-//  • Neutral header with "Explore" + gradient accent underline
-//  • Search bar matching Home Page
-//  • Filter: All · Barter · Custom chips
-//  • Popular Skills: 12 neutral icon+label chips
-//  • 2-column grid  (16px corners, gradient headers)
-//  • Own posts → Edit + Delete icons inside card
 // ═══════════════════════════════════════════════════════════════════════════
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -69,32 +63,36 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   final _searchCtrl = TextEditingController();
-  String _query       = '';
-  String _exchange    = 'all'; // 'all' | 'barter' | 'custom'
+  String _query = '';
+  String _exchange = 'all';
   String? _activeCat;
   final Set<String> _activeFilters = {};
 
-  // ── theme shortcuts ─────────────────────────────────────────────────────
-  bool  get _d  => Theme.of(context).brightness == Brightness.dark;
-  Color get _bg => _d ? const Color(0xFF111318) : Colors.white;
-  Color get _sf => _d ? const Color(0xFF1A1D24) : Colors.white;
-  Color get _sv => _d ? const Color(0xFF22252E) : const Color(0xFFF2F2F4);
-  Color get _bd => _d ? const Color(0xFF2A2D36) : const Color(0xFFEFEFEF);
-  Color get _tp => _d ? const Color(0xFFF2F2F4) : const Color(0xFF0A0A0A);
-  Color get _ts => _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
-  Color get _tl => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
-  Color get _cb => _d ? const Color(0xFF22252E) : const Color(0xFFF2F2F4); // chip bg
-  Color get _ce => _d ? const Color(0xFF32363F) : const Color(0xFFE0E0E0); // chip border
+  // ── theme shortcuts — matches feed_screen tokens exactly ─────────────────
+  bool get _d => Theme.of(context).brightness == Brightness.dark;
+  Color get _bg => _d ? const Color(0xFF0A0A14) : Colors.white;
+  Color get _sf => _d ? const Color(0xFF0E0E1C) : Colors.white;
+  Color get _sv => _d ? const Color(0xFF1A1A2E) : const Color(0xFFF2F2F4);
+  Color get _bd => _d ? const Color(0xFF1E1E2E) : AppColors.divider;
+  Color get _tp => _d ? AppColors.darkTextPrimary : AppColors.textPrimary;
+  Color get _ts => _d ? AppColors.darkTextSecondary : AppColors.textSecondary;
+  Color get _tl => _d ? const Color(0xFF555575) : AppColors.textLight;
+  Color get _cb => _d ? const Color(0xFF1A1A2E) : const Color(0xFFF2F2F4);
+  Color get _ce => _d ? const Color(0xFF252540) : AppColors.border;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback(
-        (_) => context.read<PostService>().fetchPosts());
+      (_) => context.read<PostService>().fetchPosts(),
+    );
   }
 
   @override
-  void dispose() { _searchCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   void _search(String q) {
     setState(() => _query = q);
@@ -114,30 +112,43 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _pickCat(String cat) {
     final next = _activeCat == cat ? null : cat;
-    setState(() { _activeCat = next; });
+    setState(() => _activeCat = next);
     final kw = next ?? '';
     _searchCtrl.text = kw;
     _search(kw);
   }
 
-  void _toggleFilter(String f) =>
-      setState(() => _activeFilters.contains(f)
-          ? _activeFilters.remove(f)
-          : _activeFilters.add(f));
+  void _toggleFilter(String f) => setState(
+    () => _activeFilters.contains(f)
+        ? _activeFilters.remove(f)
+        : _activeFilters.add(f),
+  );
 
   Future<void> _delete(String postId) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete post?', style: GoogleFonts.dmSans(fontWeight: FontWeight.w700)),
+        title: Text(
+          'Delete post?',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
         content: Text('This cannot be undone.', style: GoogleFonts.dmSans()),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: Text('Cancel', style: GoogleFonts.dmSans(color: _ts))),
-          TextButton(onPressed: () => Navigator.pop(context, true),
-              child: Text('Delete', style: GoogleFonts.dmSans(
-                  color: AppColors.error, fontWeight: FontWeight.w700))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.dmSans(color: _ts)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.dmSans(
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -155,8 +166,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-
-          // ── Sticky neutral header ─────────────────────────────────────────
+          // ── Sticky header — matches feed header style ──────────────────
           SliverAppBar(
             pinned: true,
             backgroundColor: _sf,
@@ -164,20 +174,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
             scrolledUnderElevation: 0,
             surfaceTintColor: Colors.transparent,
             automaticallyImplyLeading: false,
-            centerTitle: false,
             toolbarHeight: 56,
-            title: Text('Explore',
-                style: GoogleFonts.dmSans(
-                  color: _tp, fontSize: 22,
-                  fontWeight: FontWeight.w800, letterSpacing: -0.5,
-                )),
+            title: Text(
+              'Explore',
+              style: GoogleFonts.dmSans(
+                color: _tp,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
               child: Divider(height: 1, thickness: 1, color: _bd),
             ),
           ),
 
-          // ── Search bar ────────────────────────────────────────────────────
+          // ── Search bar — identical to feed ─────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -186,16 +199,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 height: 46,
                 decoration: BoxDecoration(
                   color: _sv,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _query.isNotEmpty ? AppColors.primary : _ce,
-                    width: _query.isNotEmpty ? 1.5 : 1,
-                  ),
+                  borderRadius: BorderRadius.circular(13),
+                  border: _query.isNotEmpty
+                      ? Border.all(color: AppColors.primary, width: 1.5)
+                      : null,
                 ),
                 child: Row(
                   children: [
                     const SizedBox(width: 13),
-                    Icon(Icons.search_rounded, color: _ts, size: 18),
+                    Icon(Icons.search_rounded, color: _ts, size: 19),
                     const SizedBox(width: 9),
                     Expanded(
                       child: TextField(
@@ -204,7 +216,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         style: GoogleFonts.dmSans(color: _tp, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: 'Search skills, people...',
-                          hintStyle: GoogleFonts.dmSans(color: _ts, fontSize: 14),
+                          hintStyle: GoogleFonts.dmSans(
+                            color: _ts,
+                            fontSize: 14,
+                          ),
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding: EdgeInsets.zero,
@@ -214,11 +229,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     if (_query.isNotEmpty)
                       GestureDetector(
                         onTap: () {
-                          _searchCtrl.clear(); _search('');
+                          _searchCtrl.clear();
+                          _search('');
                           setState(() => _activeCat = null);
                         },
-                        child: Padding(padding: const EdgeInsets.all(11),
-                            child: Icon(Icons.close_rounded, color: _ts, size: 16)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(11),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: _ts,
+                            size: 17,
+                          ),
+                        ),
                       )
                     else
                       const SizedBox(width: 13),
@@ -228,17 +250,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 40.ms),
           ),
 
-          // ── Popular Skills heading + chips ────────────────────────────────
+          // ── Popular Skills heading ─────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-              child: Text('Popular Skills',
-                  style: GoogleFonts.dmSans(
-                      color: _tp, fontSize: 14.5,
-                      fontWeight: FontWeight.w700, letterSpacing: -0.1)),
+              child: Text(
+                'Popular Skills',
+                style: GoogleFonts.dmSans(
+                  color: _tp,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                ),
+              ),
             ),
           ),
 
+          // ── Category chips — same style as feed ───────────────────────
           SliverToBoxAdapter(
             child: SizedBox(
               height: 40,
@@ -254,26 +282,37 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 170),
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: active ? AppColors.primary : _cb,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: active ? AppColors.primary : _ce, width: 1,
+                          color: active ? AppColors.primary : _ce,
+                          width: 1,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(c.icon, size: 13,
-                              color: active ? Colors.white : _ts),
+                          Icon(
+                            c.icon,
+                            size: 13,
+                            color: active ? Colors.white : _ts,
+                          ),
                           const SizedBox(width: 5),
-                          Text(c.label,
-                              style: GoogleFonts.dmSans(
-                                fontSize: 12,
-                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                                color: active ? Colors.white : _ts,
-                              )),
+                          Text(
+                            c.label,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 12,
+                              fontWeight: active
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: active ? Colors.white : _ts,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -283,37 +322,42 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 70.ms),
           ),
 
-          // ── Filter row: All · Barter · Custom + 10 advanced chips ──────────
+          // ── Filter row ────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Filter:',
-                      style: GoogleFonts.dmSans(
-                          color: _tp, fontSize: 13.5,
-                          fontWeight: FontWeight.w700)),
+                  Text(
+                    'Filter:',
+                    style: GoogleFonts.dmSans(
+                      color: _tp,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 7,
                     runSpacing: 7,
                     children: [
-                      // ── Primary exchange filters ──────────────────────
                       ...[
-                        ('all',    'All'),
+                        ('all', 'All'),
                         ('barter', 'Barter'),
                         ('custom', 'Custom'),
                       ].map(((String, String) rec) {
-                        final v      = rec.$1;
-                        final label  = rec.$2;
+                        final v = rec.$1;
+                        final label = rec.$2;
                         final active = _exchange == v;
                         return GestureDetector(
                           onTap: () => _setExchange(v),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 160),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 13, vertical: 7),
+                              horizontal: 13,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
                               color: active ? AppColors.primary : _cb,
                               borderRadius: BorderRadius.circular(20),
@@ -322,22 +366,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 width: active ? 1.5 : 1,
                               ),
                             ),
-                            child: Text(label,
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 12.5,
-                                  fontWeight:
-                                      active ? FontWeight.w700 : FontWeight.w500,
-                                  color: active ? Colors.white : _ts,
-                                )),
+                            child: Text(
+                              label,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 12.5,
+                                fontWeight: active
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: active ? Colors.white : _ts,
+                              ),
+                            ),
                           ),
                         );
                       }).toList(),
-
-                      // ── Advanced filters ──────────────────────────────
                       ...[
-                        'Trending', 'New', 'Top Rated', 'Urgent',
-                        'Quick', 'Long term', 'Online', 'In person',
-                        'Flexible', 'Beginner friendly',
+                        'Trending',
+                        'New',
+                        'Top Rated',
+                        'Urgent',
+                        'Quick',
+                        'Long term',
+                        'Online',
+                        'In person',
+                        'Flexible',
+                        'Beginner friendly',
                       ].map((f) {
                         final on = _activeFilters.contains(f);
                         return GestureDetector(
@@ -345,10 +397,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 160),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 13, vertical: 7),
+                              horizontal: 13,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
                               color: on
-                                  ? AppColors.primary.withOpacity(0.1)
+                                  ? AppColors.primary.withOpacity(0.10)
                                   : _cb,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
@@ -356,13 +410,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 width: on ? 1.5 : 1,
                               ),
                             ),
-                            child: Text(f,
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 12.5,
-                                  fontWeight:
-                                      on ? FontWeight.w700 : FontWeight.w500,
-                                  color: on ? AppColors.primary : _ts,
-                                )),
+                            child: Text(
+                              f,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 12.5,
+                                fontWeight: on
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: on ? AppColors.primary : _ts,
+                              ),
+                            ),
                           ),
                         );
                       }).toList(),
@@ -375,7 +432,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
-          // ── 2-column grid ─────────────────────────────────────────────────
+          // ── 2-column grid ─────────────────────────────────────────────
           Consumer<PostService>(
             builder: (_, ps, __) {
               if (ps.isLoading && ps.posts.isEmpty) {
@@ -383,63 +440,92 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
                     delegate: SliverChildBuilderDelegate(
-                        (_, __) => _ShimmerCard(d: _d), childCount: 6),
+                      (_, __) => _ShimmerCard(d: _d),
+                      childCount: 6,
+                    ),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, mainAxisSpacing: 10,
-                      crossAxisSpacing: 10, childAspectRatio: 0.88,
-                    ),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 0.88,
+                        ),
                   ),
                 );
               }
 
-              if (ps.posts.isEmpty) return SliverFillRemaining(child: _empty());
+              if (ps.posts.isEmpty) {
+                return SliverFillRemaining(child: _empty());
+              }
 
               return SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                 sliver: SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) {
-                      final p = ps.posts[i];
-                      return _ExploreCard(
-                        key: ValueKey(p.id),
-                        post: p,
-                        gradient: _gradFor(p),
-                        isOwn: p.userId == myId,
-                        d: _d, tp: _tp, ts: _ts, tl: _tl,
-                        cardSurface: _d ? const Color(0xFF1A1D24) : Colors.white,
-                        cardBorder: _bd,
-                        stripBg: _d ? const Color(0xFF22252E) : const Color(0xFFF6F6F8),
-                        stripDivider: _d ? const Color(0xFF32363F) : const Color(0xFFE5E5E5),
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)));
-                        },
-                        onAuthorTap: () {
-                          if (p.profile?.id != null) {
-                            Navigator.push(context,
-                                MaterialPageRoute(builder: (_) =>
-                                    UserProfileScreen(userId: p.profile!.id)));
-                          }
-                        },
-                        onBookmark: () => ps.toggleBookmark(p.id),
-                        onEdit: () => Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => CreatePostScreen(post: p))),
-                        onDelete: () => _delete(p.id),
-                      )
-                          .animate()
-                          .fadeIn(delay: Duration(milliseconds: i * 40))
-                          .slideY(begin: 0.07,
-                              delay: Duration(milliseconds: i * 40),
-                              curve: Curves.easeOutCubic);
-                    },
-                    childCount: ps.posts.length,
-                  ),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, mainAxisSpacing: 10,
-                    crossAxisSpacing: 10, childAspectRatio: 0.88,
+                  delegate: SliverChildBuilderDelegate((_, i) {
+                    final p = ps.posts[i];
+                    return _ExploreCard(
+                          key: ValueKey(p.id),
+                          post: p,
+                          gradient: _gradFor(p),
+                          isOwn: p.userId == myId,
+                          d: _d,
+                          tp: _tp,
+                          ts: _ts,
+                          tl: _tl,
+                          cardSurface: _d
+                              ? const Color(0xFF111126)
+                              : Colors.white,
+                          cardBorder: _d
+                              ? const Color(0xFF252540)
+                              : AppColors.border,
+                          stripBg: _d
+                              ? const Color(0xFF1A1A2E)
+                              : const Color(0xFFF6F6F8),
+                          stripDivider: _d
+                              ? const Color(0xFF252540)
+                              : const Color(0xFFE5E5E5),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PostDetailScreen(post: p),
+                              ),
+                            );
+                          },
+                          onAuthorTap: () {
+                            if (p.profile?.id != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      UserProfileScreen(userId: p.profile!.id),
+                                ),
+                              );
+                            }
+                          },
+                          onBookmark: () => ps.toggleBookmark(p.id),
+                          onEdit: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CreatePostScreen(post: p),
+                            ),
+                          ),
+                          onDelete: () => _delete(p.id),
+                        )
+                        .animate()
+                        .fadeIn(delay: Duration(milliseconds: i * 40))
+                        .slideY(
+                          begin: 0.07,
+                          delay: Duration(milliseconds: i * 40),
+                          curve: Curves.easeOutCubic,
+                        );
+                  }, childCount: ps.posts.length),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.88,
                   ),
                 ),
               );
@@ -451,31 +537,42 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _empty() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.07),
-                  shape: BoxShape.circle),
-              child: const Icon(Icons.search_off_rounded,
-                  size: 42, color: AppColors.primary),
-            ),
-            const SizedBox(height: 16),
-            Text('No results found',
-                style: GoogleFonts.dmSans(
-                    color: _tp, fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 5),
-            Text('Try a different search or filter',
-                style: GoogleFonts.dmSans(color: _ts, fontSize: 13)),
-          ],
-        ).animate().fadeIn(),
-      );
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.07),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.search_off_rounded,
+            size: 42,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'No results found',
+          style: GoogleFonts.dmSans(
+            color: _tp,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          'Try a different search or filter',
+          style: GoogleFonts.dmSans(color: _ts, fontSize: 13),
+        ),
+      ],
+    ).animate().fadeIn(),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ExploreCard  –  2-col grid card with gradient header
+//  _ExploreCard  –  2-col grid card (no Swap button — never had one)
 // ─────────────────────────────────────────────────────────────────────────────
 class _ExploreCard extends StatelessWidget {
   final PostModel post;
@@ -486,21 +583,37 @@ class _ExploreCard extends StatelessWidget {
 
   const _ExploreCard({
     super.key,
-    required this.post, required this.gradient,
-    required this.isOwn, required this.d,
-    required this.tp, required this.ts, required this.tl,
-    required this.cardSurface, required this.cardBorder,
-    required this.stripBg, required this.stripDivider,
-    required this.onTap, required this.onAuthorTap,
-    required this.onBookmark, required this.onEdit, required this.onDelete,
+    required this.post,
+    required this.gradient,
+    required this.isOwn,
+    required this.d,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+    required this.cardSurface,
+    required this.cardBorder,
+    required this.stripBg,
+    required this.stripDivider,
+    required this.onTap,
+    required this.onAuthorTap,
+    required this.onBookmark,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   String get _catLabel {
     final s = post.skillOffered.toLowerCase();
-    if (s.contains('design') || s.contains('figma') || s.contains('canva')) return 'Design';
-    if (s.contains('code') || s.contains('flutter') || s.contains('python') ||
-        s.contains('java') || s.contains('react') || s.contains('dev')) return 'Dev';
-    if (s.contains('music') || s.contains('guitar') || s.contains('piano')) return 'Music';
+    if (s.contains('design') || s.contains('figma') || s.contains('canva'))
+      return 'Design';
+    if (s.contains('code') ||
+        s.contains('flutter') ||
+        s.contains('python') ||
+        s.contains('java') ||
+        s.contains('react') ||
+        s.contains('dev'))
+      return 'Dev';
+    if (s.contains('music') || s.contains('guitar') || s.contains('piano'))
+      return 'Music';
     if (s.contains('math')) return 'Math';
     if (post.isOpenRequest) return 'Help';
     return 'Skill';
@@ -519,18 +632,19 @@ class _ExploreCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(d ? 0.20 : 0.05),
-              blurRadius: 10, offset: const Offset(0, 3),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ── Gradient header ──────────────────────────────────────────
+            // Gradient header
             ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
               child: Container(
                 height: 60,
                 decoration: BoxDecoration(
@@ -542,53 +656,69 @@ class _ExploreCard extends StatelessWidget {
                 ),
                 child: Stack(
                   children: [
-                    // Decorative circle
                     Positioned(
-                      right: -14, top: -14,
+                      right: -14,
+                      top: -14,
                       child: Container(
-                        width: 60, height: 60,
+                        width: 60,
+                        height: 60,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.14),
                           shape: BoxShape.circle,
                         ),
                       ),
                     ),
-                    // Category label (top-left)
                     Positioned(
-                      left: 8, top: 8,
+                      left: 8,
+                      top: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.82),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(_catLabel,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 9, fontWeight: FontWeight.w700,
-                              color: gradient[1],
-                            )),
+                        child: Text(
+                          _catLabel,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: gradient[1],
+                          ),
+                        ),
                       ),
                     ),
-                    // Own: Edit + Delete (top-right)
                     if (isOwn)
                       Positioned(
-                        right: 7, top: 7,
-                        child: Row(children: [
-                          _MiniBtn(icon: Icons.edit_outlined,
-                              color: AppColors.primary, onTap: onEdit),
-                          const SizedBox(width: 5),
-                          _MiniBtn(icon: Icons.delete_outline_rounded,
-                              color: AppColors.error, onTap: onDelete),
-                        ]),
+                        right: 7,
+                        top: 7,
+                        child: Row(
+                          children: [
+                            _MiniBtn(
+                              icon: Icons.edit_outlined,
+                              color: AppColors.primary,
+                              onTap: onEdit,
+                            ),
+                            const SizedBox(width: 5),
+                            _MiniBtn(
+                              icon: Icons.delete_outline_rounded,
+                              color: AppColors.error,
+                              onTap: onDelete,
+                            ),
+                          ],
+                        ),
                       )
                     else
                       Positioned(
-                        right: 7, top: 7,
+                        right: 7,
+                        top: 7,
                         child: GestureDetector(
                           onTap: onBookmark,
                           child: Container(
-                            width: 26, height: 26,
+                            width: 26,
+                            height: 26,
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.8),
                               shape: BoxShape.circle,
@@ -599,43 +729,57 @@ class _ExploreCard extends StatelessWidget {
                                   : Icons.bookmark_outline_rounded,
                               size: 14,
                               color: post.isBookmarked
-                                  ? AppColors.primary : gradient[1],
+                                  ? AppColors.primary
+                                  : gradient[1],
                             ),
                           ),
                         ),
                       ),
-                    // My Swap badge + exchange badge (bottom)
                     if (isOwn)
                       Positioned(
-                        left: 8, bottom: 7,
+                        left: 8,
+                        bottom: 7,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: gradient[1].withOpacity(0.22),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text('My Swap',
-                              style: GoogleFonts.dmSans(
-                                  fontSize: 8, fontWeight: FontWeight.w700,
-                                  color: gradient[1])),
+                          child: Text(
+                            'My Swap',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                              color: gradient[1],
+                            ),
+                          ),
                         ),
                       ),
                     Positioned(
-                      right: 8, bottom: 7,
+                      right: 8,
+                      bottom: 7,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.82),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(isBarter ? 'Barter' : 'Custom',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 8, fontWeight: FontWeight.w700,
-                              color: isBarter
-                                  ? AppColors.primary : AppColors.accentTeal,
-                            )),
+                        child: Text(
+                          isBarter ? 'Barter' : 'Custom',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 8,
+                            fontWeight: FontWeight.w700,
+                            color: isBarter
+                                ? AppColors.primary
+                                : AppColors.accentTeal,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -643,7 +787,7 @@ class _ExploreCard extends StatelessWidget {
               ),
             ),
 
-            // ── Author ───────────────────────────────────────────────────
+            // Author
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 8, 9, 0),
               child: GestureDetector(
@@ -658,42 +802,58 @@ class _ExploreCard extends StatelessWidget {
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
-                        post.profile?.fullName?.split(' ').first
-                            ?? post.profile?.username ?? 'User',
+                        post.profile?.fullName?.split(' ').first ??
+                            post.profile?.username ??
+                            'User',
                         style: GoogleFonts.dmSans(
-                            color: ts, fontSize: 10.5,
-                            fontWeight: FontWeight.w600),
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                          color: ts,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if ((post.profile?.averageRating ?? 0) > 0) ...[
-                      Icon(Icons.star_rounded,
-                          size: 11, color: Colors.amber.shade500),
+                      Icon(
+                        Icons.star_rounded,
+                        size: 11,
+                        color: Colors.amber.shade500,
+                      ),
                       const SizedBox(width: 2),
-                      Text(post.profile!.averageRating.toStringAsFixed(1),
-                          style: GoogleFonts.dmSans(
-                              color: ts, fontSize: 10,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        post.profile!.averageRating.toStringAsFixed(1),
+                        style: GoogleFonts.dmSans(
+                          color: ts,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ],
                 ),
               ),
             ),
 
-            // ── Title ────────────────────────────────────────────────────
+            // Title
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 5, 9, 0),
-              child: Text(post.title,
-                  style: GoogleFonts.dmSans(
-                    color: tp, fontSize: 12,
-                    fontWeight: FontWeight.w700, height: 1.3,
-                  ),
-                  maxLines: 2, overflow: TextOverflow.ellipsis),
+              child: Text(
+                post.title,
+                style: GoogleFonts.dmSans(
+                  color: tp,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
 
             const Spacer(),
 
-            // ── Offering / Wants strip ────────────────────────────────────
+            // Offering / Wants strip
             Container(
               margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -707,27 +867,44 @@ class _ExploreCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('OFFERING',
-                            style: GoogleFonts.dmSans(
-                                fontSize: 7.5, color: tl,
-                                fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                        const SizedBox(height: 2),
-                        Row(children: [
-                          Icon(Icons.star_rounded, size: 9, color: AppColors.primary),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(post.skillOffered,
-                                style: GoogleFonts.dmSans(
-                                    fontSize: 10, color: AppColors.primary,
-                                    fontWeight: FontWeight.w700),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          'OFFERING',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 7.5,
+                            color: tl,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
                           ),
-                        ]),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 9,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                post.skillOffered,
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 10,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                   Container(
-                    width: 1, height: 26,
+                    width: 1,
+                    height: 26,
                     color: stripDivider,
                     margin: const EdgeInsets.symmetric(horizontal: 6),
                   ),
@@ -735,10 +912,15 @@ class _ExploreCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(isBarter ? 'WANTS' : 'OFFERS',
-                            style: GoogleFonts.dmSans(
-                                fontSize: 7.5, color: tl,
-                                fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                        Text(
+                          isBarter ? 'WANTS' : 'OFFERS',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 7.5,
+                            color: tl,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                         const SizedBox(height: 2),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -755,7 +937,8 @@ class _ExploreCard extends StatelessWidget {
                                       : AppColors.accentTeal,
                                   fontWeight: FontWeight.w700,
                                 ),
-                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.end,
                               ),
                             ),
@@ -766,7 +949,8 @@ class _ExploreCard extends StatelessWidget {
                                   : Icons.card_giftcard_rounded,
                               size: 9,
                               color: isBarter
-                                  ? AppColors.secondary : AppColors.accentTeal,
+                                  ? AppColors.secondary
+                                  : AppColors.accentTeal,
                             ),
                           ],
                         ),
@@ -783,21 +967,32 @@ class _ExploreCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 class _MiniBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _MiniBtn({required this.icon, required this.color, required this.onTap});
+  const _MiniBtn({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 26, height: 26,
+        width: 26,
+        height: 26,
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.88),
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4),
+          ],
         ),
         child: Icon(icon, size: 13, color: color),
       ),
@@ -808,13 +1003,16 @@ class _MiniBtn extends StatelessWidget {
 class _ShimmerCard extends StatelessWidget {
   final bool d;
   const _ShimmerCard({required this.d});
+
   @override
   Widget build(BuildContext context) {
-    final base = d ? const Color(0xFF22252E) : const Color(0xFFEEEEEE);
-    final high = d ? const Color(0xFF2A2D36) : const Color(0xFFF8F8F8);
+    final base = d ? const Color(0xFF111126) : const Color(0xFFEEEEEE);
+    final high = d ? const Color(0xFF1A1A2E) : const Color(0xFFF8F8F8);
     return Container(
       decoration: BoxDecoration(
-          color: base, borderRadius: BorderRadius.circular(16)),
+        color: base,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -822,36 +1020,60 @@ class _ShimmerCard extends StatelessWidget {
             height: 60,
             decoration: BoxDecoration(
               color: high,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(10),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(width: 20, height: 20,
-                    decoration: BoxDecoration(color: high, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Container(width: 55, height: 8,
-                    decoration: BoxDecoration(color: high,
-                        borderRadius: BorderRadius.circular(4))),
-              ]),
-              const SizedBox(height: 8),
-              Container(width: double.infinity, height: 9,
-                  decoration: BoxDecoration(color: high,
-                      borderRadius: BorderRadius.circular(4))),
-              const SizedBox(height: 5),
-              Container(width: 70, height: 9,
-                  decoration: BoxDecoration(color: high,
-                      borderRadius: BorderRadius.circular(4))),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: high,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 55,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: high,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: high,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  width: 70,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: high,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-}
-
-extension on String {
-  String capitalize() => isNotEmpty ? '${this[0].toUpperCase()}${substring(1)}' : this;
 }

@@ -7,6 +7,8 @@ import 'services/auth_service.dart';
 import 'services/post_service.dart';
 import 'services/chat_service.dart';
 import 'services/notification_service.dart';
+import 'services/swap_service.dart';
+import 'services/ai_match_service.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 import 'services/leaderboard_service.dart';
@@ -14,6 +16,7 @@ import 'services/leaderboard_service.dart';
 const String supabaseUrl = 'https://yxmmuyfbanwqfsyqfyug.supabase.co';
 const String supabaseAnonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bW11eWZiYW53cWZzeXFmeXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3OTQ5MTUsImV4cCI6MjA5MTM3MDkxNX0.B6tCiP3wkgyPR0HTl17bDyNNjR-kNAY2aTrVh7zOiSY';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(
@@ -49,6 +52,8 @@ class Swaply extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatService()),
         ChangeNotifierProvider(create: (_) => NotificationService()),
         ChangeNotifierProvider(create: (_) => LeaderboardService()),
+        ChangeNotifierProvider(create: (_) => SwapService()),
+        ChangeNotifierProvider(create: (_) => AiMatchService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (_, themeProvider, __) {
