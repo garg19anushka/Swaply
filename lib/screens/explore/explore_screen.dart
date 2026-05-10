@@ -11,6 +11,8 @@ import '../../widgets/avatar_widget.dart';
 import '../../widgets/shimmer_card.dart';
 import '../posts/post_detail_screen.dart';
 import '../posts/create_post_screen.dart';
+import '../posts/open_requests_screen.dart' show OpenRequestsScreen;
+import '../notifications/notifications_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../../widgets/swap_post_card.dart';
 
@@ -70,6 +72,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final Set<String> _activeFilters = {};
   String _sortBy = 'newest';
   String _skillType = 'all';
+  String _availability = 'all';
+  String _sessionFormat = 'all';
 
   // ── theme shortcuts — matches feed_screen tokens exactly ─────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
@@ -113,6 +117,173 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  // ── Local filter + sort applied only in this screen ───────────────────────
+  List<PostModel> _filteredPosts(List<PostModel> raw) {
+    List<PostModel> posts = List.of(raw);
+
+    // Skill Type
+    if (_skillType != 'all') {
+      const Map<String, Set<String>> _keywords = {
+        'technical': {
+          'coding',
+          'programming',
+          'engineering',
+          'data',
+          'ai',
+          'ml',
+          'web',
+          'app',
+          'flutter',
+          'react',
+          'java',
+          'python',
+          'math',
+        },
+        'creative': {
+          'design',
+          'art',
+          'photo',
+          'video',
+          'music',
+          'drawing',
+          'illustration',
+          'canva',
+          'figma',
+          'editing',
+        },
+        'soft': {
+          'communication',
+          'leadership',
+          'management',
+          'teamwork',
+          'speaking',
+          'presentation',
+          'negotiation',
+        },
+        'language': {
+          'language',
+          'english',
+          'hindi',
+          'french',
+          'spanish',
+          'german',
+          'japanese',
+          'chinese',
+          'translation',
+        },
+        'academic': {
+          'writing',
+          'research',
+          'essay',
+          'academic',
+          'study',
+          'tutor',
+          'homework',
+          'assignment',
+        },
+        'fitness': {
+          'fitness',
+          'yoga',
+          'gym',
+          'workout',
+          'nutrition',
+          'health',
+          'sport',
+          'dance',
+        },
+        'business': {
+          'business',
+          'marketing',
+          'finance',
+          'accounting',
+          'sales',
+          'entrepreneurship',
+          'startup',
+          'excel',
+        },
+      };
+      final kws = _keywords[_skillType] ?? {};
+      if (kws.isNotEmpty) {
+        posts = posts.where((p) {
+          final hay = '${p.skillOffered} ${p.title} ${p.tags.join(' ')}'
+              .toLowerCase();
+          return kws.any((k) => hay.contains(k));
+        }).toList();
+      }
+    }
+
+    // Availability
+    if (_availability != 'all') {
+      final now = DateTime.now();
+      posts = posts.where((p) {
+        final hrs = now.difference(p.createdAt).inHours;
+        switch (_availability) {
+          case 'now':
+            return hrs < 24;
+          case 'this_week':
+            return hrs < 168;
+          case 'weekends':
+            return now.weekday >= 6;
+          case 'evenings':
+            return now.hour >= 17;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    // Session Format
+    if (_sessionFormat != 'all') {
+      posts = posts.where((p) {
+        final hay = '${p.title} ${p.description} ${p.tags.join(' ')}'
+            .toLowerCase();
+        switch (_sessionFormat) {
+          case 'online':
+            return hay.contains('online') ||
+                hay.contains('virtual') ||
+                hay.contains('remote');
+          case 'in_person':
+            return hay.contains('in person') ||
+                hay.contains('offline') ||
+                hay.contains('campus');
+          case 'hybrid':
+            return hay.contains('hybrid') || hay.contains('both');
+          case 'async':
+            return hay.contains('async') ||
+                hay.contains('self-paced') ||
+                hay.contains('flexible');
+          default:
+            return true;
+        }
+      }).toList();
+    }
+
+    // Sort
+    switch (_sortBy) {
+      case 'oldest':
+        posts.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        break;
+      case 'rating_high':
+        posts.sort(
+          (a, b) => (b.profile?.averageRating ?? 0).compareTo(
+            a.profile?.averageRating ?? 0,
+          ),
+        );
+        break;
+      case 'rating_low':
+        posts.sort(
+          (a, b) => (a.profile?.averageRating ?? 0).compareTo(
+            b.profile?.averageRating ?? 0,
+          ),
+        );
+        break;
+      default: // newest — already ordered from DB
+        break;
+    }
+
+    return posts;
+  }
+
   void _pickCat(String cat) {
     final next = _activeCat == cat ? null : cat;
     setState(() => _activeCat = next);
@@ -132,6 +303,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     String localSort = _sortBy;
     String localExchange = _exchange;
     String localSkillType = _skillType;
+    String localAvailability = _availability;
+    String localSessionFormat = _sessionFormat;
 
     showModalBottomSheet(
       context: context,
@@ -315,9 +488,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       const Spacer(),
                       GestureDetector(
                         onTap: () {
-                          localSort = 'newest';
-                          localExchange = 'all';
-                          localSkillType = 'all';
+                          setState(() {
+                            _sortBy = 'newest';
+                            _exchange = 'all';
+                            _skillType = 'all';
+                            _availability = 'all';
+                            _sessionFormat = 'all';
+                          });
+                          context.read<PostService>().fetchPosts(
+                            searchQuery: _query.isEmpty ? null : _query,
+                          );
                           setSt(() {});
                         },
                         child: Text(
@@ -416,6 +596,50 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+
+                  // ── Availability ─────────────────────────────────────
+                  _sectionLabel('Availability'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final rec in [
+                        ('all', 'Any Time'),
+                        ('now', 'Available Now'),
+                        ('this_week', 'This Week'),
+                        ('weekends', 'Weekends'),
+                        ('evenings', 'Evenings'),
+                      ])
+                        _segChip(
+                          rec.$2,
+                          localAvailability == rec.$1,
+                          () => localAvailability = rec.$1,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Session Format ───────────────────────────────────
+                  _sectionLabel('Session Format'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final rec in [
+                        ('all', 'Any Format'),
+                        ('online', 'Online'),
+                        ('in_person', 'In Person'),
+                        ('hybrid', 'Hybrid'),
+                        ('async', 'Async / Self-paced'),
+                      ])
+                        _segChip(
+                          rec.$2,
+                          localSessionFormat == rec.$1,
+                          () => localSessionFormat = rec.$1,
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 24),
 
                   // ── Apply button — flat purple like screenshot ────────
@@ -425,6 +649,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         _sortBy = localSort;
                         _exchange = localExchange;
                         _skillType = localSkillType;
+                        _availability = localAvailability;
+                        _sessionFormat = localSessionFormat;
                       });
                       context.read<PostService>().fetchPosts(
                         searchQuery: _query.isEmpty ? null : _query,
@@ -511,6 +737,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
             surfaceTintColor: Colors.transparent,
             automaticallyImplyLeading: false,
             toolbarHeight: 56,
+            titleSpacing: 20,
+            centerTitle: false,
             title: Text(
               'Explore',
               style: GoogleFonts.dmSans(
@@ -520,16 +748,87 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 letterSpacing: -0.5,
               ),
             ),
+            actions: [
+              // Open Requests button
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OpenRequestsScreen()),
+                ),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppColors.warning.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.help_outline_rounded,
+                        size: 15,
+                        color: AppColors.warning,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Open\nRequests',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.dmSans(
+                          color: AppColors.warning,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Notifications button
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                ),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: _d
+                        ? AppColors.darkSurfaceVariant
+                        : const Color(0xFFF2F2F4),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    Icons.notifications_outlined,
+                    size: 19,
+                    color: _tp,
+                  ),
+                ),
+              ),
+            ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
               child: Divider(height: 1, thickness: 1, color: _bd),
             ),
           ),
 
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
           // ── Search bar with filter icon ────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               child: Row(
                 children: [
                   Expanded(
@@ -590,7 +889,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Filter icon button
                   GestureDetector(
                     onTap: _showFilterSheet,
                     child: AnimatedContainer(
@@ -601,7 +899,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         color:
                             (_exchange != 'all' ||
                                 _skillType != 'all' ||
-                                _sortBy != 'newest')
+                                _sortBy != 'newest' ||
+                                _availability != 'all' ||
+                                _sessionFormat != 'all')
                             ? AppColors.primary
                             : _sv,
                         borderRadius: BorderRadius.circular(13),
@@ -612,7 +912,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         color:
                             (_exchange != 'all' ||
                                 _skillType != 'all' ||
-                                _sortBy != 'newest')
+                                _sortBy != 'newest' ||
+                                _availability != 'all' ||
+                                _sessionFormat != 'all')
                             ? Colors.white
                             : _ts,
                       ),
@@ -623,76 +925,203 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 40.ms),
           ),
 
-          // ── Popular Skills heading ─────────────────────────────────────
+          // ── Spotlight card — derived from real post data ───────────────
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-              child: Text(
-                'Popular Skills',
-                style: GoogleFonts.dmSans(
-                  color: _tp,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ),
-          ),
+            child: Consumer<PostService>(
+              builder: (_, ps, __) {
+                if (ps.posts.isEmpty) return const SizedBox.shrink();
 
-          // ── Category chips — same style as feed ───────────────────────
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                itemCount: _cats.length,
-                itemBuilder: (_, i) {
-                  final c = _cats[i];
-                  final active = _activeCat == c.label;
-                  return GestureDetector(
-                    onTap: () => _pickCat(c.label),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 170),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                // Find top-rated post by bookmarksCount
+                final sorted = [
+                  ...ps.posts,
+                ]..sort((a, b) => b.bookmarksCount.compareTo(a.bookmarksCount));
+                final top = sorted.first;
+
+                // Count how many offer vs want this skill
+                final skillLower = top.skillOffered.toLowerCase();
+                final offering = ps.posts
+                    .where(
+                      (p) => p.skillOffered.toLowerCase().contains(skillLower),
+                    )
+                    .length;
+                final seeking = ps.posts
+                    .where(
+                      (p) => (p.skillWanted ?? '').toLowerCase().contains(
+                        skillLower,
                       ),
-                      decoration: BoxDecoration(
-                        color: active ? AppColors.primary : _cb,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: active ? AppColors.primary : _ce,
-                          width: 1,
+                    )
+                    .length;
+
+                // Pills: tags first, then skillWanted, cap at 3
+                final pills = <String>{
+                  ...top.tags,
+                  if (top.skillWanted != null) top.skillWanted!,
+                }.take(3).toList();
+                if (pills.isEmpty) pills.add(top.skillOffered);
+
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PostDetailScreen(post: top),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            c.icon,
-                            size: 13,
-                            color: active ? Colors.white : _ts,
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0D1B3E), Color(0xFF1A1060)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF3A2E80).withOpacity(0.6),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF7C5CFC).withOpacity(0.18),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            c.label,
-                            style: GoogleFonts.dmSans(
-                              fontSize: 12,
-                              fontWeight: active
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: active ? Colors.white : _ts,
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          // Glowing orb decoration
+                          Positioned(
+                            right: -20,
+                            top: -20,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(
+                                  0xFF7C5CFC,
+                                ).withOpacity(0.12),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF7C5CFC,
+                                    ).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFF7C5CFC,
+                                      ).withOpacity(0.5),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        '⭐',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'SPOTLIGHT — TOP RATED',
+                                        style: GoogleFonts.dmSans(
+                                          color: const Color(0xFFB8A4FF),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                // Title
+                                Text(
+                                  top.title,
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 8),
+                                // Stats line
+                                Text(
+                                  '$offering student${offering == 1 ? '' : 's'} offering ${top.skillOffered}'
+                                  '${seeking > 0 ? ' · $seeking seeking it' : ''}',
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                // Skill pills
+                                Wrap(
+                                  spacing: 8,
+                                  children: pills
+                                      .map(
+                                        (tag) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.08,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(
+                                                0.15,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: GoogleFonts.dmSans(
+                                              color: Colors.white.withOpacity(
+                                                0.9,
+                                              ),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ).animate().fadeIn(delay: 70.ms),
+                  ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.04),
+                );
+              },
+            ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 14)),

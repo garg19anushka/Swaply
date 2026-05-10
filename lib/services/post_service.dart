@@ -22,10 +22,14 @@ class PostService extends ChangeNotifier {
     String? searchQuery,
     String? exchangeType,
     bool openRequestsOnly = false,
+    String sortBy = 'newest', // newest | oldest | rating_high | rating_low
+    String skillType =
+        'all', // all | technical | creative | soft | language | academic | fitness | business
+    String availability = 'all', // all | now | this_week | weekends | evenings
+    String sessionFormat = 'all', // all | online | in_person | hybrid | async
   }) async {
     _setLoading(true);
     try {
-      // Build filter query using PostgrestFilterBuilder (before .order())
       var query = supabase
           .from('posts')
           .select('*, profiles(*)')
@@ -41,7 +45,9 @@ class PostService extends ChangeNotifier {
         query = query.ilike('title', '%$searchQuery%');
       }
 
-      final data = await query.order('created_at', ascending: false);
+      // DB-level sort: only createdAt is reliable from DB
+      final ascending = sortBy == 'oldest';
+      final data = await query.order('created_at', ascending: ascending);
 
       final userId = supabase.auth.currentUser?.id;
 
@@ -56,11 +62,190 @@ class PostService extends ChangeNotifier {
         );
       }
 
-      _posts = (data as List).map((json) {
+      List<PostModel> posts = (data as List).map((json) {
         final post = PostModel.fromJson(json);
         post.isBookmarked = bookmarkedIds.contains(post.id);
         return post;
       }).toList();
+
+      // ── Client-side: Skill Type filter ────────────────────────────
+      if (skillType != 'all') {
+        final _technical = {
+          'coding',
+          'programming',
+          'engineering',
+          'data',
+          'ai',
+          'ml',
+          'web',
+          'app',
+          'flutter',
+          'react',
+          'java',
+          'python',
+          'math',
+        };
+        final _creative = {
+          'design',
+          'art',
+          'photo',
+          'video',
+          'music',
+          'drawing',
+          'illustration',
+          'canva',
+          'figma',
+          'editing',
+        };
+        final _soft = {
+          'communication',
+          'leadership',
+          'management',
+          'teamwork',
+          'speaking',
+          'presentation',
+          'negotiation',
+        };
+        final _language = {
+          'language',
+          'english',
+          'hindi',
+          'french',
+          'spanish',
+          'german',
+          'japanese',
+          'chinese',
+          'translation',
+        };
+        final _academic = {
+          'writing',
+          'research',
+          'essay',
+          'academic',
+          'study',
+          'tutor',
+          'homework',
+          'assignment',
+        };
+        final _fitness = {
+          'fitness',
+          'yoga',
+          'gym',
+          'workout',
+          'nutrition',
+          'health',
+          'sport',
+          'dance',
+        };
+        final _business = {
+          'business',
+          'marketing',
+          'finance',
+          'accounting',
+          'sales',
+          'entrepreneurship',
+          'startup',
+          'excel',
+        };
+
+        Set<String> keywords;
+        switch (skillType) {
+          case 'technical':
+            keywords = _technical;
+            break;
+          case 'creative':
+            keywords = _creative;
+            break;
+          case 'soft':
+            keywords = _soft;
+            break;
+          case 'language':
+            keywords = _language;
+            break;
+          case 'academic':
+            keywords = _academic;
+            break;
+          case 'fitness':
+            keywords = _fitness;
+            break;
+          case 'business':
+            keywords = _business;
+            break;
+          default:
+            keywords = {};
+        }
+
+        if (keywords.isNotEmpty) {
+          posts = posts.where((p) {
+            final haystack = '${p.skillOffered} ${p.title} ${p.tags.join(' ')}'
+                .toLowerCase();
+            return keywords.any((kw) => haystack.contains(kw));
+          }).toList();
+        }
+      }
+
+      // ── Client-side: Availability filter ──────────────────────────
+      if (availability != 'all') {
+        final now = DateTime.now();
+        posts = posts.where((p) {
+          final hoursSince = now.difference(p.createdAt).inHours;
+          switch (availability) {
+            case 'now':
+              return hoursSince < 24;
+            case 'this_week':
+              return hoursSince < 168;
+            case 'weekends':
+              return now.weekday == 6 || now.weekday == 7;
+            case 'evenings':
+              return now.hour >= 17 || now.hour < 23;
+            default:
+              return true;
+          }
+        }).toList();
+      }
+
+      // ── Client-side: Session Format filter ────────────────────────
+      if (sessionFormat != 'all') {
+        posts = posts.where((p) {
+          final haystack = '${p.title} ${p.description} ${p.tags.join(' ')}'
+              .toLowerCase();
+          switch (sessionFormat) {
+            case 'online':
+              return haystack.contains('online') ||
+                  haystack.contains('virtual') ||
+                  haystack.contains('remote');
+            case 'in_person':
+              return haystack.contains('in person') ||
+                  haystack.contains('offline') ||
+                  haystack.contains('campus');
+            case 'hybrid':
+              return haystack.contains('hybrid') || haystack.contains('both');
+            case 'async':
+              return haystack.contains('async') ||
+                  haystack.contains('self-paced') ||
+                  haystack.contains('flexible');
+            default:
+              return true;
+          }
+        }).toList();
+      }
+
+      // ── Client-side: Rating sort ───────────────────────────────────
+      if (sortBy == 'rating_high') {
+        posts.sort(
+          (a, b) => (b.profile?.averageRating ?? 0).compareTo(
+            a.profile?.averageRating ?? 0,
+          ),
+        );
+      } else if (sortBy == 'rating_low') {
+        posts.sort(
+          (a, b) => (a.profile?.averageRating ?? 0).compareTo(
+            b.profile?.averageRating ?? 0,
+          ),
+        );
+      }
+
+      _posts = posts;
 
       if (openRequestsOnly) {
         _openRequests = _posts;

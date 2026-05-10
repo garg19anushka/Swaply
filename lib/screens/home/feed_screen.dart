@@ -213,7 +213,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 floating: false,
                 expandedHeight: 0,
                 toolbarHeight: 0,
-                backgroundColor: _sf,
+                backgroundColor: _bg,
                 elevation: 0,
                 scrolledUnderElevation: 0,
                 surfaceTintColor: Colors.transparent,
@@ -223,7 +223,7 @@ class _FeedScreenState extends State<FeedScreen> {
               // ── Non-sticky header ────────────────────────────────
               SliverToBoxAdapter(
                 child: Container(
-                  color: _sf,
+                  color: _bg,
                   child: SafeArea(
                     bottom: false,
                     child: Column(
@@ -261,29 +261,6 @@ class _FeedScreenState extends State<FeedScreen> {
                                   ],
                                 ),
                               ),
-                              GestureDetector(
-                                onTap: () => widget.onSwitchTab?.call(4),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      'Hey, $name',
-                                      style: GoogleFonts.dmSans(
-                                        color: _tp,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    AvatarWidget(
-                                      avatarUrl: auth.currentProfile?.avatarUrl,
-                                      username:
-                                          auth.currentProfile?.username ?? name,
-                                      radius: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
                               _IconBtn(
                                 icon: Icons.notifications_outlined,
                                 d: _d,
@@ -294,53 +271,12 @@ class _FeedScreenState extends State<FeedScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              GestureDetector(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const OpenRequestsScreen(),
-                                  ),
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 11,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.warning.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: AppColors.warning.withOpacity(0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.help_outline_rounded,
-                                        size: 15,
-                                        color: AppColors.warning,
-                                      ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        'Open\nRequests',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.dmSans(
-                                          color: AppColors.warning,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ).animate().fadeIn(duration: 320.ms),
 
+                        const SizedBox(height: 10),
+                        Divider(height: 1, thickness: 1, color: _bd),
                         const SizedBox(height: 12),
                         HomeHeroCard(
                           onBrowse: () => widget.onSwitchTab?.call(1),
@@ -349,7 +285,6 @@ class _FeedScreenState extends State<FeedScreen> {
                           activeSwaps: 24,
                         ),
                         const SizedBox(height: 8),
-                        Divider(height: 1, thickness: 1, color: _bd),
                       ],
                     ),
                   ),
@@ -1696,37 +1631,7 @@ class _SwapPostCardState extends State<SwapPostCard>
           color: AppColors.error,
           onTap: widget.onDelete ?? () {},
         ),
-        const SizedBox(width: 10),
       ],
-      GestureDetector(
-        onTap: widget.onSwap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF7C5CFC).withOpacity(0.38),
-                blurRadius: 16,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Text(
-            'Swap →',
-            style: GoogleFonts.dmSans(
-              color: Colors.white,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ),
     ],
   );
 
