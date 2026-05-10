@@ -12,6 +12,7 @@ import '../../widgets/shimmer_card.dart';
 import '../posts/post_detail_screen.dart';
 import '../posts/create_post_screen.dart';
 import '../profile/user_profile_screen.dart';
+import '../../widgets/swap_post_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Category chip data
@@ -67,6 +68,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String _exchange = 'all';
   String? _activeCat;
   final Set<String> _activeFilters = {};
+  String _sortBy = 'newest';
+  String _skillType = 'all';
 
   // ── theme shortcuts — matches feed_screen tokens exactly ─────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
@@ -123,6 +126,339 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ? _activeFilters.remove(f)
         : _activeFilters.add(f),
   );
+
+  void _showFilterSheet() {
+    // local copies so sheet is self-contained until Apply is tapped
+    String localSort = _sortBy;
+    String localExchange = _exchange;
+    String localSkillType = _skillType;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSt) {
+          final sheetBg = _d ? const Color(0xFF111126) : Colors.white;
+          final rowBg = _d ? const Color(0xFF191932) : const Color(0xFFF5F5FA);
+          final divClr = _d ? const Color(0xFF252545) : const Color(0xFFEAEAF0);
+          final activeClr = const Color(0xFF7C5CFC);
+
+          // ── Radio-style row ──────────────────────────────────────────
+          Widget _radioRow({
+            required String label,
+            required IconData icon,
+            required bool active,
+            required VoidCallback onTap,
+            bool isFirst = false,
+            bool isLast = false,
+          }) {
+            final radius = BorderRadius.vertical(
+              top: Radius.circular(isFirst ? 14 : 0),
+              bottom: Radius.circular(isLast ? 14 : 0),
+            );
+            return GestureDetector(
+              onTap: () {
+                onTap();
+                setSt(() {});
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                decoration: BoxDecoration(
+                  color: active ? activeClr.withOpacity(0.12) : rowBg,
+                  borderRadius: radius,
+                  border: Border.all(
+                    color: active
+                        ? activeClr.withOpacity(0.6)
+                        : Colors.transparent,
+                    width: active ? 1.5 : 0,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 15,
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 17, color: active ? activeClr : _ts),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: active ? activeClr : _tp,
+                        ),
+                      ),
+                    ),
+                    // Radio circle
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: active ? activeClr : divClr,
+                          width: active ? 0 : 2,
+                        ),
+                        color: active ? activeClr : Colors.transparent,
+                      ),
+                      child: active
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // ── Segment chip (exchange type / skill type) ─────────────────
+          Widget _segChip(String label, bool active, VoidCallback onTap) =>
+              GestureDetector(
+                onTap: () {
+                  onTap();
+                  setSt(() {});
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: active ? activeClr : rowBg,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: active ? activeClr : divClr,
+                      width: active ? 0 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    label,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                      color: active ? Colors.white : _ts,
+                    ),
+                  ),
+                ),
+              );
+
+          // ── Section label ─────────────────────────────────────────────
+          Widget _sectionLabel(String text) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              text,
+              style: GoogleFonts.dmSans(
+                color: _ts,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          );
+
+          // ── Thin divider between radio rows ───────────────────────────
+          Widget _divider() => Container(height: 1, color: divClr);
+
+          return Container(
+            decoration: BoxDecoration(
+              color: sheetBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              14,
+              20,
+              20 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _d ? Colors.white24 : Colors.black12,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Title row
+                  Row(
+                    children: [
+                      Text(
+                        'Filters',
+                        style: GoogleFonts.dmSans(
+                          color: _tp,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () {
+                          localSort = 'newest';
+                          localExchange = 'all';
+                          localSkillType = 'all';
+                          setSt(() {});
+                        },
+                        child: Text(
+                          'Reset all',
+                          style: GoogleFonts.dmSans(
+                            color: activeClr,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Sort By ──────────────────────────────────────────
+                  _sectionLabel('Sort By'),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Column(
+                      children: [
+                        _radioRow(
+                          label: 'Newest First',
+                          icon: Icons.arrow_downward_rounded,
+                          active: localSort == 'newest',
+                          onTap: () => localSort = 'newest',
+                          isFirst: true,
+                        ),
+                        _divider(),
+                        _radioRow(
+                          label: 'Oldest First',
+                          icon: Icons.arrow_upward_rounded,
+                          active: localSort == 'oldest',
+                          onTap: () => localSort = 'oldest',
+                        ),
+                        _divider(),
+                        _radioRow(
+                          label: 'Rating: High → Low',
+                          icon: Icons.star_rounded,
+                          active: localSort == 'rating_high',
+                          onTap: () => localSort = 'rating_high',
+                        ),
+                        _divider(),
+                        _radioRow(
+                          label: 'Rating: Low → High',
+                          icon: Icons.star_outline_rounded,
+                          active: localSort == 'rating_low',
+                          onTap: () => localSort = 'rating_low',
+                          isLast: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Exchange Type ────────────────────────────────────
+                  _sectionLabel('Exchange Type'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final rec in [
+                        ('all', 'All'),
+                        ('barter', 'Barter'),
+                        ('custom', 'Custom'),
+                      ])
+                        _segChip(
+                          rec.$2,
+                          localExchange == rec.$1,
+                          () => localExchange = rec.$1,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Skill Type ───────────────────────────────────────
+                  _sectionLabel('Skill Type'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final rec in [
+                        ('all', 'All Types'),
+                        ('technical', 'Technical'),
+                        ('creative', 'Creative'),
+                        ('soft', 'Soft Skills'),
+                        ('language', 'Language'),
+                        ('academic', 'Academic'),
+                        ('fitness', 'Fitness'),
+                        ('business', 'Business'),
+                      ])
+                        _segChip(
+                          rec.$2,
+                          localSkillType == rec.$1,
+                          () => localSkillType = rec.$1,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Apply button — flat purple like screenshot ────────
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _sortBy = localSort;
+                        _exchange = localExchange;
+                        _skillType = localSkillType;
+                      });
+                      context.read<PostService>().fetchPosts(
+                        searchQuery: _query.isEmpty ? null : _query,
+                        exchangeType: _exchange == 'all' ? null : _exchange,
+                      );
+                      Navigator.pop(ctx);
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C5CFC),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        'Apply Filters',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.dmSans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   Future<void> _delete(String postId) async {
     final ok = await showDialog<bool>(
@@ -190,62 +526,99 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ),
 
-          // ── Search bar — identical to feed ─────────────────────────────
+          // ── Search bar with filter icon ────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 46,
-                decoration: BoxDecoration(
-                  color: _sv,
-                  borderRadius: BorderRadius.circular(13),
-                  border: _query.isNotEmpty
-                      ? Border.all(color: AppColors.primary, width: 1.5)
-                      : null,
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 13),
-                    Icon(Icons.search_rounded, color: _ts, size: 19),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        onChanged: _search,
-                        style: GoogleFonts.dmSans(color: _tp, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'Search skills, people...',
-                          hintStyle: GoogleFonts.dmSans(
-                            color: _ts,
-                            fontSize: 14,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: _sv,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 13),
+                          Icon(Icons.search_rounded, color: _ts, size: 19),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: TextField(
+                              controller: _searchCtrl,
+                              onChanged: _search,
+                              style: GoogleFonts.dmSans(
+                                color: _tp,
+                                fontSize: 14,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Search skills, people...',
+                                hintStyle: GoogleFonts.dmSans(
+                                  color: _ts,
+                                  fontSize: 14,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                                filled: false,
+                              ),
+                            ),
                           ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
+                          if (_query.isNotEmpty)
+                            GestureDetector(
+                              onTap: () {
+                                _searchCtrl.clear();
+                                _search('');
+                                setState(() => _activeCat = null);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(11),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: _ts,
+                                  size: 17,
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(width: 13),
+                        ],
                       ),
                     ),
-                    if (_query.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          _searchCtrl.clear();
-                          _search('');
-                          setState(() => _activeCat = null);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(11),
-                          child: Icon(
-                            Icons.close_rounded,
-                            color: _ts,
-                            size: 17,
-                          ),
-                        ),
-                      )
-                    else
-                      const SizedBox(width: 13),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Filter icon button
+                  GestureDetector(
+                    onTap: _showFilterSheet,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color:
+                            (_exchange != 'all' ||
+                                _skillType != 'all' ||
+                                _sortBy != 'newest')
+                            ? AppColors.primary
+                            : _sv,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(
+                        Icons.tune_rounded,
+                        size: 20,
+                        color:
+                            (_exchange != 'all' ||
+                                _skillType != 'all' ||
+                                _sortBy != 'newest')
+                            ? Colors.white
+                            : _ts,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ).animate().fadeIn(delay: 40.ms),
           ),
@@ -322,134 +695,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 70.ms),
           ),
 
-          // ── Filter row ────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Filter:',
-                    style: GoogleFonts.dmSans(
-                      color: _tp,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: [
-                      ...[
-                        ('all', 'All'),
-                        ('barter', 'Barter'),
-                        ('custom', 'Custom'),
-                      ].map(((String, String) rec) {
-                        final v = rec.$1;
-                        final label = rec.$2;
-                        final active = _exchange == v;
-                        return GestureDetector(
-                          onTap: () => _setExchange(v),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 13,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: active ? AppColors.primary : _cb,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: active ? AppColors.primary : _ce,
-                                width: active ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Text(
-                              label,
-                              style: GoogleFonts.dmSans(
-                                fontSize: 12.5,
-                                fontWeight: active
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: active ? Colors.white : _ts,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                      ...[
-                        'Trending',
-                        'New',
-                        'Top Rated',
-                        'Urgent',
-                        'Quick',
-                        'Long term',
-                        'Online',
-                        'In person',
-                        'Flexible',
-                        'Beginner friendly',
-                      ].map((f) {
-                        final on = _activeFilters.contains(f);
-                        return GestureDetector(
-                          onTap: () => _toggleFilter(f),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 13,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: on
-                                  ? AppColors.primary.withOpacity(0.10)
-                                  : _cb,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: on ? AppColors.primary : _ce,
-                                width: on ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Text(
-                              f,
-                              style: GoogleFonts.dmSans(
-                                fontSize: 12.5,
-                                fontWeight: on
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: on ? AppColors.primary : _ts,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: 55.ms),
-          ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
-          // ── 2-column grid ─────────────────────────────────────────────
+          // ── Posts list — same SwapPostCard as feed ────────────────────
           Consumer<PostService>(
             builder: (_, ps, __) {
               if (ps.isLoading && ps.posts.isEmpty) {
                 return SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverGrid(
+                  sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (_, __) => _ShimmerCard(d: _d),
-                      childCount: 6,
+                      (_, __) => const ShimmerCard(),
+                      childCount: 4,
                     ),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 0.88,
-                        ),
                   ),
                 );
               }
@@ -459,32 +717,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                sliver: SliverGrid(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 100),
+                sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((_, i) {
                     final p = ps.posts[i];
-                    return _ExploreCard(
+                    return SwapPostCard(
                           key: ValueKey(p.id),
                           post: p,
-                          gradient: _gradFor(p),
                           isOwn: p.userId == myId,
-                          d: _d,
-                          tp: _tp,
-                          ts: _ts,
-                          tl: _tl,
-                          cardSurface: _d
-                              ? const Color(0xFF111126)
-                              : Colors.white,
-                          cardBorder: _d
-                              ? const Color(0xFF252540)
-                              : AppColors.border,
-                          stripBg: _d
-                              ? const Color(0xFF1A1A2E)
-                              : const Color(0xFFF6F6F8),
-                          stripDivider: _d
-                              ? const Color(0xFF252540)
-                              : const Color(0xFFE5E5E5),
-                          onTap: () {
+                          onSwap: () {
                             HapticFeedback.selectionClick();
                             Navigator.push(
                               context,
@@ -493,8 +734,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               ),
                             );
                           },
-                          onAuthorTap: () {
+                          onBookmark: () => ps.toggleBookmark(p.id),
+                          onTapAuthor: () {
                             if (p.profile?.id != null) {
+                              HapticFeedback.selectionClick();
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -504,7 +747,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               );
                             }
                           },
-                          onBookmark: () => ps.toggleBookmark(p.id),
                           onEdit: () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -516,17 +758,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         .animate()
                         .fadeIn(delay: Duration(milliseconds: i * 40))
                         .slideY(
-                          begin: 0.07,
+                          begin: 0.06,
                           delay: Duration(milliseconds: i * 40),
                           curve: Curves.easeOutCubic,
                         );
                   }, childCount: ps.posts.length),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.88,
-                  ),
                 ),
               );
             },

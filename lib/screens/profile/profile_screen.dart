@@ -10,11 +10,12 @@ import '../../services/chat_service.dart';
 import '../../services/post_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
-import '../../widgets/post_card.dart';
 import '../auth/login_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
+import '../posts/post_detail_screen.dart';
+import '../posts/create_post_screen.dart';
 import 'package:Swaply/widgets/swap_post_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -1787,7 +1788,59 @@ class _PostsTabState extends State<_PostsTab> {
     return ListView.builder(
       padding: const EdgeInsets.only(top: 8),
       itemCount: _posts.length,
-      itemBuilder: (_, i) => PostCard(post: _posts[i]),
+      itemBuilder: (_, i) {
+        final p = _posts[i];
+        final myId = context.read<AuthService>().currentUser?.id;
+        final isOwn = p.userId == myId;
+        return SwapPostCard(
+          key: ValueKey(p.id),
+          post: p,
+          isOwn: isOwn,
+          onSwap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)),
+          ),
+          onBookmark: () => context.read<PostService>().toggleBookmark(p.id),
+          onTapAuthor: () {},
+          onEdit: isOwn
+              ? () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CreatePostScreen(post: p)),
+                )
+              : null,
+          onDelete: isOwn
+              ? () async {
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text('Delete post?'),
+                      content: const Text('This cannot be undone.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: AppColors.error),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok == true && mounted) {
+                    await context.read<PostService>().deletePost(p.id);
+                    setState(() => _posts.removeWhere((x) => x.id == p.id));
+                  }
+                }
+              : null,
+        );
+      },
     );
   }
 }
@@ -1818,7 +1871,20 @@ class _BookmarksTab extends StatelessWidget {
         return ListView.builder(
           padding: const EdgeInsets.only(top: 8),
           itemCount: ps.bookmarkedPosts.length,
-          itemBuilder: (_, i) => PostCard(post: ps.bookmarkedPosts[i]),
+          itemBuilder: (_, i) {
+            final p = ps.bookmarkedPosts[i];
+            return SwapPostCard(
+              key: ValueKey(p.id),
+              post: p,
+              isOwn: false,
+              onSwap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)),
+              ),
+              onBookmark: () => ps.toggleBookmark(p.id),
+              onTapAuthor: () {},
+            );
+          },
         );
       },
     );

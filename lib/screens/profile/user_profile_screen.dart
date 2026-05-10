@@ -8,11 +8,13 @@ import '../../models/profile_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/post_service.dart';
+import '../posts/post_detail_screen.dart';
+import '../posts/create_post_screen.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
-import '../../widgets/post_card.dart';
 import '../../main.dart';
 import 'package:Swaply/widgets/swap_post_card.dart';
+
 class UserProfileScreen extends StatefulWidget {
   final String userId;
   const UserProfileScreen({super.key, required this.userId});
@@ -443,8 +445,86 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             : ListView.builder(
                                 padding: const EdgeInsets.only(top: 4),
                                 itemCount: _posts.length,
-                                itemBuilder: (_, i) =>
-                                    PostCard(post: _posts[i]),
+                                itemBuilder: (_, i) {
+                                  final p = _posts[i];
+                                  return SwapPostCard(
+                                    key: ValueKey(p.id),
+                                    post: p,
+                                    isOwn: isOwn,
+                                    onSwap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            PostDetailScreen(post: p),
+                                      ),
+                                    ),
+                                    onBookmark: () => context
+                                        .read<PostService>()
+                                        .toggleBookmark(p.id),
+                                    onTapAuthor: () {},
+                                    onEdit: isOwn
+                                        ? () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  CreatePostScreen(post: p),
+                                            ),
+                                          )
+                                        : null,
+                                    onDelete: isOwn
+                                        ? () async {
+                                            final ok = await showDialog<bool>(
+                                              context: context,
+                                              builder: (_) => AlertDialog(
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                title: const Text(
+                                                  'Delete post?',
+                                                ),
+                                                content: const Text(
+                                                  'This cannot be undone.',
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          false,
+                                                        ),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          context,
+                                                          true,
+                                                        ),
+                                                    child: Text(
+                                                      'Delete',
+                                                      style: TextStyle(
+                                                        color: AppColors.error,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                            if (ok == true && mounted) {
+                                              await context
+                                                  .read<PostService>()
+                                                  .deletePost(p.id);
+                                              setState(
+                                                () => _posts.removeWhere(
+                                                  (x) => x.id == p.id,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        : null,
+                                  );
+                                },
                               ),
 
                         // Reviews tab
