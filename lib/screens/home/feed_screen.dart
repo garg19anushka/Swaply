@@ -9,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/post_service.dart';
 import '../../services/swap_service.dart';
 import '../../services/ai_match_service.dart';
+import '../../services/leaderboard_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/shimmer_card.dart';
@@ -19,6 +20,7 @@ import '../posts/open_requests_screen.dart';
 import '../posts/create_post_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../swaps/all_swaps_screen.dart';
+import '../leaderboard/leaderboard_screen.dart';
 import '../../widgets/chatbot_widget.dart';
 
 typedef TabSwitchCallback = void Function(int index);
@@ -262,6 +264,17 @@ class _FeedScreenState extends State<FeedScreen> {
                                 ),
                               ),
                               _IconBtn(
+                                icon: Icons.emoji_events_outlined,
+                                d: _d,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const LeaderboardScreen(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _IconBtn(
                                 icon: Icons.notifications_outlined,
                                 d: _d,
                                 onTap: () => Navigator.push(
@@ -393,6 +406,19 @@ class _FeedScreenState extends State<FeedScreen> {
                       ],
                     );
                   },
+                ),
+              ),
+
+              // ══════════════════════════════════════════════════════
+              //  LEADERBOARD PREVIEW  – top 3 from LeaderboardService
+              // ══════════════════════════════════════════════════════
+              SliverToBoxAdapter(
+                child: _LeaderboardPreviewSection(
+                  dark: _d,
+                  tp: _tp,
+                  ts: _ts,
+                  bd: _bd,
+                  sv: _sv,
                 ),
               ),
 
@@ -1769,6 +1795,243 @@ class _CatChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Leaderboard Preview Section  (home feed inline widget)
+// ─────────────────────────────────────────────────────────────────────────────
+class _LeaderboardPreviewSection extends StatefulWidget {
+  final bool dark;
+  final Color tp, ts, bd, sv;
+  const _LeaderboardPreviewSection({
+    required this.dark,
+    required this.tp,
+    required this.ts,
+    required this.bd,
+    required this.sv,
+  });
+
+  @override
+  State<_LeaderboardPreviewSection> createState() =>
+      _LeaderboardPreviewSectionState();
+}
+
+class _LeaderboardPreviewSectionState
+    extends State<_LeaderboardPreviewSection> {
+  final _svc = LeaderboardService();
+
+  @override
+  void initState() {
+    super.initState();
+    _svc.fetchLeaderboard();
+  }
+
+  @override
+  void dispose() {
+    _svc.dispose();
+    super.dispose();
+  }
+
+  Color get _sf => widget.dark ? const Color(0xFF161824) : Colors.white;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider.value(
+      value: _svc,
+      child: Consumer<LeaderboardService>(
+        builder: (_, svc, __) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Section header ──────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('🏆', style: TextStyle(fontSize: 15)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Top Swappers',
+                          style: GoogleFonts.dmSans(
+                            color: widget.tp,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const LeaderboardScreen(),
+                        ),
+                      ),
+                      child: Text(
+                        'See all',
+                        style: GoogleFonts.dmSans(
+                          color: AppColors.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // ── Loading shimmer ─────────────────────────────
+                if (svc.isLoading)
+                  Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: widget.sv,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+
+                // ── Top 3 row ───────────────────────────────────
+                if (!svc.isLoading && svc.filteredEntries.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _sf,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: widget.bd, width: 1),
+                    ),
+                    child: Row(
+                      children: svc.filteredEntries
+                          .take(3)
+                          .toList()
+                          .asMap()
+                          .entries
+                          .map((e) {
+                            final idx = e.key;
+                            final entry = e.value;
+                            final medals = [
+                              const Color(0xFFFFD700),
+                              const Color(0xFFC0C0C0),
+                              const Color(0xFFCD7F32),
+                            ];
+                            return Expanded(
+                              child: GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        UserProfileScreen(userId: entry.id),
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        AvatarWidget(
+                                          avatarUrl: entry.avatarUrl,
+                                          username: entry.username,
+                                          radius: 24,
+                                          borderColor: medals[idx],
+                                        ),
+                                        Positioned(
+                                          bottom: -4,
+                                          right: 0,
+                                          left: 0,
+                                          child: Center(
+                                            child: Container(
+                                              width: 18,
+                                              height: 18,
+                                              decoration: BoxDecoration(
+                                                color: medals[idx],
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: _sf,
+                                                  width: 1.5,
+                                                ),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  '${idx + 1}',
+                                                  style: GoogleFonts.dmSans(
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: idx == 0
+                                                        ? Colors.black87
+                                                        : Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      entry.username,
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: widget.tp,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${entry.totalSwaps} swaps',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 10,
+                                        color: widget.ts,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          })
+                          .toList(),
+                    ),
+                  ),
+
+                // ── Empty state ─────────────────────────────────
+                if (!svc.isLoading && svc.filteredEntries.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _sf,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: widget.bd, width: 1),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'No swappers yet — be the first! 🚀',
+                        style: GoogleFonts.dmSans(
+                          color: widget.ts,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

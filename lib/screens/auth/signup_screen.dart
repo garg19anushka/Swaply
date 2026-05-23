@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/swaply_logo.dart';
+import '../home/main_nav_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -13,18 +14,18 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _nameCtrl     = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
-  final _emailCtrl    = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
-  final _nameFocus     = FocusNode();
+  final _nameFocus = FocusNode();
   final _usernameFocus = FocusNode();
-  final _emailFocus    = FocusNode();
+  final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
-  bool _obscure  = true;
-  bool _loading  = false;
+  bool _obscure = true;
+  bool _loading = false;
   String? _authError;
 
   // Per-field errors
@@ -34,33 +35,37 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _passwordError;
 
   // ── Palette ─────────────────────────────────────────────────────────────
-  static const _bg        = Color(0xFF0D0E17);
-  static const _cardBg    = Color(0xFF161824);
-  static const _inputBg   = Color(0xFF13141F);
-  static const _border    = Color(0xFF2E3048);
-  static const _purple    = Color(0xFF6C63FF);
+  static const _bg = Color(0xFF0D0E17);
+  static const _cardBg = Color(0xFF161824);
+  static const _inputBg = Color(0xFF13141F);
+  static const _border = Color(0xFF2E3048);
+  static const _purple = Color(0xFF6C63FF);
   static const _headerTop = Color(0xFF7B72FF);
   static const _headerBot = Color(0xFF5A4EE0);
-  static const _textMain  = Color(0xFFFFFFFF);
-  static const _textSub   = Color(0xFF8E90A8);
-  static const _textHint  = Color(0xFF545670);
-  static const _errorRed  = Color(0xFFFF5C6A);
+  static const _textMain = Color(0xFFFFFFFF);
+  static const _textSub = Color(0xFF8E90A8);
+  static const _textHint = Color(0xFF545670);
+  static const _errorRed = Color(0xFFFF5C6A);
 
   @override
   void initState() {
     super.initState();
-    _nameFocus.addListener(()     => setState(() {}));
+    _nameFocus.addListener(() => setState(() {}));
     _usernameFocus.addListener(() => setState(() {}));
-    _emailFocus.addListener(()    => setState(() {}));
+    _emailFocus.addListener(() => setState(() {}));
     _passwordFocus.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _usernameCtrl.dispose();
-    _emailCtrl.dispose(); _passwordCtrl.dispose();
-    _nameFocus.dispose(); _usernameFocus.dispose();
-    _emailFocus.dispose(); _passwordFocus.dispose();
+    _nameCtrl.dispose();
+    _usernameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _nameFocus.dispose();
+    _usernameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -68,7 +73,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _validate() {
     bool ok = true;
     setState(() {
-      _nameError = _usernameError = _emailError = _passwordError = _authError = null;
+      _nameError = _usernameError = _emailError = _passwordError = _authError =
+          null;
 
       if (_nameCtrl.text.trim().isEmpty) {
         _nameError = 'Please enter your full name';
@@ -114,26 +120,51 @@ class _SignupScreenState extends State<SignupScreen> {
     FocusScope.of(context).unfocus();
     if (!_validate()) return;
 
-    setState(() { _loading = true; _authError = null; });
+    setState(() {
+      _loading = true;
+      _authError = null;
+    });
     try {
-      await context.read<AuthService>().signUp(
-        email:    _emailCtrl.text.trim(),
+      final success = await context.read<AuthService>().signUp(
+        email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
         username: _usernameCtrl.text.trim(),
         fullName: _nameCtrl.text.trim(),
       );
+      if (success) {
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (_, a1, __) => const MainNavScreen(),
+            transitionsBuilder: (_, a1, __, child) =>
+                FadeTransition(opacity: a1, child: child),
+            transitionDuration: const Duration(milliseconds: 350),
+          ),
+          (route) => false,
+        );
+      } else {
+        if (mounted) {
+          final errMsg = context.read<AuthService>().errorMessage;
+          setState(() {
+            _authError = errMsg ?? 'Account creation failed. Please try again.';
+            _loading = false;
+          });
+        }
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _authError = _friendlyError(e.toString());
-          _loading   = false;
+          _loading = false;
         });
       }
     }
   }
 
   String _friendlyError(String raw) {
-    if (raw.contains('already') || raw.contains('exists') || raw.contains('taken'))
+    if (raw.contains('already') ||
+        raw.contains('exists') ||
+        raw.contains('taken'))
       return 'This email or username is already registered.';
     if (raw.contains('network') || raw.contains('socket'))
       return 'No internet connection. Please check your network.';
@@ -147,10 +178,10 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor:              Color(0xFF7B72FF),
-        statusBarIconBrightness:     Brightness.light,
-        statusBarBrightness:         Brightness.dark,
-        systemNavigationBarColor:    Color(0xFF0D0E17),
+        statusBarColor: Color(0xFF7B72FF),
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Color(0xFF0D0E17),
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
@@ -176,7 +207,12 @@ class _SignupScreenState extends State<SignupScreen> {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.only(top: topPad + 14, left: 20, right: 20, bottom: 26),
+      padding: EdgeInsets.only(
+        top: topPad + 14,
+        left: 20,
+        right: 20,
+        bottom: 26,
+      ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [_headerTop, _headerBot],
@@ -190,12 +226,17 @@ class _SignupScreenState extends State<SignupScreen> {
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.18),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 24),
+              child: const Icon(
+                Icons.chevron_left_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -206,15 +247,22 @@ class _SignupScreenState extends State<SignupScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Create Account',
+                  Text(
+                    'Create Account',
                     style: GoogleFonts.dmSans(
-                      color: Colors.white, fontSize: 24,
-                      fontWeight: FontWeight.w800, letterSpacing: -0.5,
-                    )),
-                  Text('Join the campus skill community',
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  Text(
+                    'Join the campus skill community',
                     style: GoogleFonts.dmSans(
-                      color: Colors.white.withOpacity(0.75), fontSize: 13,
-                    )),
+                      color: Colors.white.withOpacity(0.75),
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -237,43 +285,62 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Column(
         children: [
           _field(
-            ctrl: _nameCtrl, focus: _nameFocus,
-            hint: 'Full Name', icon: Icons.person_outline_rounded,
+            ctrl: _nameCtrl,
+            focus: _nameFocus,
+            hint: 'Full Name',
+            icon: Icons.person_outline_rounded,
             error: _nameError,
-            onChanged: (_) { if (_nameError != null) setState(() => _nameError = null); },
+            onChanged: (_) {
+              if (_nameError != null) setState(() => _nameError = null);
+            },
           ),
           const SizedBox(height: 12),
 
           _field(
-            ctrl: _usernameCtrl, focus: _usernameFocus,
-            hint: 'Username', icon: Icons.alternate_email_rounded,
+            ctrl: _usernameCtrl,
+            focus: _usernameFocus,
+            hint: 'Username',
+            icon: Icons.alternate_email_rounded,
             error: _usernameError,
-            onChanged: (_) { if (_usernameError != null) setState(() => _usernameError = null); },
+            onChanged: (_) {
+              if (_usernameError != null) setState(() => _usernameError = null);
+            },
           ),
           const SizedBox(height: 12),
 
           _field(
-            ctrl: _emailCtrl, focus: _emailFocus,
-            hint: 'Email', icon: Icons.mail_outline_rounded,
+            ctrl: _emailCtrl,
+            focus: _emailFocus,
+            hint: 'Email',
+            icon: Icons.mail_outline_rounded,
             type: TextInputType.emailAddress,
             error: _emailError,
-            onChanged: (_) { if (_emailError != null) setState(() => _emailError = null); },
+            onChanged: (_) {
+              if (_emailError != null) setState(() => _emailError = null);
+            },
           ),
           const SizedBox(height: 12),
 
           _field(
-            ctrl: _passwordCtrl, focus: _passwordFocus,
-            hint: 'Password', icon: Icons.lock_outline_rounded,
+            ctrl: _passwordCtrl,
+            focus: _passwordFocus,
+            hint: 'Password',
+            icon: Icons.lock_outline_rounded,
             obscure: _obscure,
             error: _passwordError,
-            onChanged: (_) { if (_passwordError != null) setState(() => _passwordError = null); },
+            onChanged: (_) {
+              if (_passwordError != null) setState(() => _passwordError = null);
+            },
             suffix: GestureDetector(
               onTap: () => setState(() => _obscure = !_obscure),
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: Icon(
-                  _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                  color: _textHint, size: 18,
+                  _obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: _textHint,
+                  size: 18,
                 ),
               ),
             ),
@@ -304,13 +371,16 @@ class _SignupScreenState extends State<SignupScreen> {
     String? error,
     ValueChanged<String>? onChanged,
   }) {
-    final focused  = focus.hasFocus;
+    final focused = focus.hasFocus;
     final hasError = error != null;
 
     Color borderColor;
-    if (hasError)     borderColor = _errorRed;
-    else if (focused) borderColor = _purple;
-    else              borderColor = _border;
+    if (hasError)
+      borderColor = _errorRed;
+    else if (focused)
+      borderColor = _purple;
+    else
+      borderColor = _border;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,17 +395,19 @@ class _SignupScreenState extends State<SignupScreen> {
               color: borderColor,
               width: hasError || focused ? 1.6 : 1.2,
             ),
-            boxShadow: focused ? [
-              BoxShadow(color: _purple.withOpacity(0.12), blurRadius: 8),
-            ] : [],
+            boxShadow: focused
+                ? [BoxShadow(color: _purple.withOpacity(0.12), blurRadius: 8)]
+                : [],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(width: 16),
-              Icon(icon,
+              Icon(
+                icon,
                 color: hasError ? _errorRed : (focused ? _purple : _textHint),
-                size: 18),
+                size: 18,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Theme(
@@ -359,13 +431,17 @@ class _SignupScreenState extends State<SignupScreen> {
                     autofillHints: const [],
                     enableIMEPersonalizedLearning: false,
                     style: GoogleFonts.dmSans(
-                      color: _textMain, fontSize: 15, fontWeight: FontWeight.w400,
+                      color: _textMain,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
                     ),
                     cursorColor: _purple,
                     decoration: InputDecoration(
                       hintText: hint,
                       hintStyle: GoogleFonts.dmSans(
-                        color: _textHint, fontSize: 15, fontWeight: FontWeight.w400,
+                        color: _textHint,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
                       ),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -391,10 +467,14 @@ class _SignupScreenState extends State<SignupScreen> {
                 Icon(Icons.error_outline_rounded, color: _errorRed, size: 13),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(error,
+                  child: Text(
+                    error,
                     style: GoogleFonts.dmSans(
-                      color: _errorRed, fontSize: 12, fontWeight: FontWeight.w500,
-                    )),
+                      color: _errorRed,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -419,10 +499,14 @@ class _SignupScreenState extends State<SignupScreen> {
           Icon(Icons.warning_amber_rounded, color: _errorRed, size: 16),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(msg,
+            child: Text(
+              msg,
               style: GoogleFonts.dmSans(
-                color: _errorRed, fontSize: 13, fontWeight: FontWeight.w500,
-              )),
+                color: _errorRed,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
         ],
       ),
@@ -445,7 +529,8 @@ class _SignupScreenState extends State<SignupScreen> {
           boxShadow: [
             BoxShadow(
               color: _purple.withOpacity(0.40),
-              blurRadius: 18, offset: const Offset(0, 6),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -455,17 +540,27 @@ class _SignupScreenState extends State<SignupScreen> {
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             disabledBackgroundColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
           child: _loading
               ? const SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
                 )
-              : Text('Create Account',
+              : Text(
+                  'Create Account',
                   style: GoogleFonts.dmSans(
-                    color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700,
-                  )),
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
         ),
       ),
     );

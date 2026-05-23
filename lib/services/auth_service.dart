@@ -90,9 +90,10 @@ class AuthService extends ChangeNotifier {
         email: email.trim(),
         password: password.trim(),
       );
-      _setLoading(false);
-      // Navigate immediately — fetch profile in the background so the
-      // user lands on the home screen without waiting for a DB round trip.
+      _isLoading = false;
+      // Notify listeners so the UI can react to the logged-in state change.
+      notifyListeners();
+      // Fetch profile in the background — don't block navigation on it.
       fetchProfile();
       return true;
     } on AuthException catch (e) {
@@ -181,7 +182,10 @@ class AuthService extends ChangeNotifier {
             );
           }
           // Persist in background — no await, no extra round trip.
-          supabase.from('profiles').update(updates).eq('id', user.id)
+          supabase
+              .from('profiles')
+              .update(updates)
+              .eq('id', user.id)
               .then((_) => debugPrint('Profile patched'))
               .catchError((e) => debugPrint('Profile patch error: $e'));
         }
@@ -224,7 +228,9 @@ class AuthService extends ChangeNotifier {
         try {
           final fileName = '${const Uuid().v4()}.jpg';
           await supabase.storage.from('avatars').upload(fileName, avatarFile);
-          finalAvatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
+          finalAvatarUrl = supabase.storage
+              .from('avatars')
+              .getPublicUrl(fileName);
         } catch (e) {
           debugPrint('Error uploading avatar: $e');
         }
@@ -240,13 +246,21 @@ class AuthService extends ChangeNotifier {
       if (skillsWanted != null) updates['skills_wanted'] = skillsWanted;
       if (finalAvatarUrl != null) updates['avatar_url'] = finalAvatarUrl;
 
-      final existing = await supabase.from('profiles').select('id').eq('id', currentUser!.id);
+      final existing = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', currentUser!.id);
       if (existing.isEmpty) {
         updates['id'] = currentUser!.id;
-        updates['username'] = currentUser!.userMetadata?['username'] ?? currentUser!.id.substring(0, 8);
+        updates['username'] =
+            currentUser!.userMetadata?['username'] ??
+            currentUser!.id.substring(0, 8);
         await supabase.from('profiles').insert(updates);
       } else {
-        await supabase.from('profiles').update(updates).eq('id', currentUser!.id);
+        await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', currentUser!.id);
       }
 
       await fetchProfile();
