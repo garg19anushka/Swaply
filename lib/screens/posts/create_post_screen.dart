@@ -14,13 +14,15 @@ class CreatePostScreen extends StatefulWidget {
   State<CreatePostScreen> createState() => _CreatePostScreenState();
 }
 
-class _CreatePostScreenState extends State<CreatePostScreen> {
+class _CreatePostScreenState extends State<CreatePostScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _skillOfferedCtrl = TextEditingController();
   final _skillWantedCtrl = TextEditingController();
   final _customOfferCtrl = TextEditingController();
+  final _customTagCtrl = TextEditingController();
 
   final _titleFocus = FocusNode();
   final _descFocus = FocusNode();
@@ -28,20 +30,70 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _skillWantedFocus = FocusNode();
   final _customOfferFocus = FocusNode();
 
+  // ── Post mode: offer vs need ──────────────────────────────────────────────
+  bool _isOfferMode = true; // true = "I want to OFFER", false = "I need"
+
   String _exchangeType = 'barter';
   bool _isOpenRequest = false;
   bool _isLoading = false;
 
-  final _availabilityOptions = [
-    'Weekends',
-    'Evenings',
-    'Flexible',
-    'Online Only',
+  // ── Tag system ────────────────────────────────────────────────────────────
+  int _tagTabIdx = 0;
+  final List<String> _tagTabs = [
+    'Urgency',
+    'Format',
+    'Level',
+    'Skill',
+    'Extras',
   ];
-  final Set<String> _selectedAvailability = {};
+  final Map<String, List<String>> _tagOptions = {
+    'Urgency': ['Urgent', 'Quick Help', 'Flexible Timeline', 'Long-term'],
+    'Format': ['Online', 'In-Person', 'Hybrid', 'Async'],
+    'Level': ['Beginner', 'Intermediate', 'Advanced', 'Expert'],
+    'Skill': [
+      'Coding',
+      'Design',
+      'Music',
+      'Writing',
+      'Language',
+      'Fitness',
+      'Finance',
+    ],
+    'Extras': [
+      'Portfolio Project',
+      'Certificate',
+      'Mentorship',
+      'Fun & Casual',
+    ],
+  };
+  final Set<String> _selectedTags = {};
+  final List<String> _customTags = [];
+
+  // ── Availability ──────────────────────────────────────────────────────────
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  final Set<String> _selectedDays = {};
+  String? _selectedTime; // null = none selected
+  final List<String> _weekDays = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
+  ];
+  final List<Map<String, String>> _timeSlots = [
+    {'label': 'Morning (6–12)', 'icon': '🌅'},
+    {'label': 'Afternoon (12–17)', 'icon': '☀️'},
+    {'label': 'Evening (17–21)', 'icon': '🌆'},
+    {'label': 'Night (21–24)', 'icon': '🌙'},
+    {'label': 'Flexible', 'icon': '🕐'},
+  ];
+
   String _sessionFormat = 'online';
 
-  // ── Palette — all non-const getters, resolved inside build() ─────────────
+  // ── Palette ────────────────────────────────────────────────────────────────
   static const _purple = Color(0xFF6C63FF);
   static const _purpleStart = Color(0xFF5B4FE8);
   static const _purpleEnd = Color(0xFF7B6FF0);
@@ -81,6 +133,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _customOfferCtrl.text = p.customOffer ?? '';
       _exchangeType = p.exchangeType;
       _isOpenRequest = p.isOpenRequest;
+      _selectedTags.addAll(p.tags);
     }
   }
 
@@ -92,6 +145,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _skillOfferedCtrl,
       _skillWantedCtrl,
       _customOfferCtrl,
+      _customTagCtrl,
     ]) {
       c.dispose();
     }
@@ -106,6 +160,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
     super.dispose();
   }
+
+  List<String> get _allTags => [
+    ..._selectedTags,
+    ..._customTags,
+    if (_selectedDays.isNotEmpty) ..._selectedDays,
+    if (_selectedTime != null) _selectedTime!,
+    if (_fromDate != null)
+      'From: ${_fromDate!.day}/${_fromDate!.month}/${_fromDate!.year}',
+    if (_toDate != null)
+      'To: ${_toDate!.day}/${_toDate!.month}/${_toDate!.year}',
+  ];
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
@@ -127,7 +192,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           customOffer: _exchangeType == 'custom'
               ? _customOfferCtrl.text.trim()
               : null,
-          tags: _selectedAvailability.toList(),
+          tags: _allTags,
           isOpenRequest: _isOpenRequest,
         );
       } else {
@@ -142,7 +207,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           customOffer: _exchangeType == 'custom'
               ? _customOfferCtrl.text.trim()
               : null,
-          tags: _selectedAvailability.toList(),
+          tags: _allTags,
           isOpenRequest: _isOpenRequest,
         );
       }
@@ -210,6 +275,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.post != null;
@@ -217,68 +283,65 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       backgroundColor: _bg,
       body: Column(
         children: [
-          _buildAppBar(isEdit, context),
+          _buildAppBar(isEdit),
           Expanded(
             child: Form(
               key: _formKey,
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _openRequestCard().animate().fadeIn(duration: 300.ms),
+                    // ── OFFER / NEED mode toggle ─────────────────────────
                     const SizedBox(height: 20),
+                    _modeToggle().animate().fadeIn(duration: 300.ms),
+                    const SizedBox(height: 24),
 
-                    _sectionLabel('POST DETAILS'),
-                    const SizedBox(height: 10),
-
+                    // ── POST DETAILS ─────────────────────────────────────
+                    _sectionHeader(Icons.description_outlined, 'Post Details'),
+                    const SizedBox(height: 12),
                     _inputField(
                       ctrl: _titleCtrl,
                       focus: _titleFocus,
-                      hint: 'Post Title',
+                      hint: _isOfferMode
+                          ? 'What skill are you offering?'
+                          : 'What skill do you need?',
                       icon: Icons.title_rounded,
                       validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Please enter a post title'
+                          ? 'Please enter a title'
                           : null,
                     ).animate().fadeIn(delay: 60.ms),
                     const SizedBox(height: 10),
-
                     _inputField(
                       ctrl: _descCtrl,
                       focus: _descFocus,
-                      hint: 'Description',
-                      icon: Icons.description_outlined,
+                      hint: 'Describe in detail…',
+                      icon: Icons.notes_rounded,
                       maxLines: 3,
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? 'Please add a description'
                           : null,
                     ).animate().fadeIn(delay: 80.ms),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
-                    _sectionLabel('Skills I Offer'),
-                    const SizedBox(height: 10),
-
+                    // ── SKILLS ───────────────────────────────────────────
+                    _sectionHeader(Icons.swap_horiz_rounded, 'Skill Exchange'),
+                    const SizedBox(height: 12),
                     _inputField(
                       ctrl: _skillOfferedCtrl,
                       focus: _skillOfferedFocus,
-                      hint: "Skill You're Offering",
+                      hint: _isOfferMode
+                          ? 'Skill I\'m offering'
+                          : 'Skill I\'m looking for',
                       icon: Icons.star_border_rounded,
                       validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Please enter the skill you\'re offering'
+                          ? 'Please enter the skill'
                           : null,
                     ).animate().fadeIn(delay: 100.ms),
-                    const SizedBox(height: 20),
-
-                    _sectionLabel('Exchange Type'),
                     const SizedBox(height: 10),
-
                     _exchangeSelector().animate().fadeIn(delay: 110.ms),
-                    const SizedBox(height: 16),
-
-                    _sectionLabel('Skill You Want in Return'),
                     const SizedBox(height: 10),
-
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 240),
                       transitionBuilder: (child, anim) => FadeTransition(
@@ -290,19 +353,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               key: const ValueKey('barter'),
                               ctrl: _skillWantedCtrl,
                               focus: _skillWantedFocus,
-                              hint: 'Skill You Want in Return',
+                              hint: 'Skill I want in return',
                               icon: Icons.swap_horiz_rounded,
                               validator: (v) =>
                                   _exchangeType == 'barter' &&
                                       (v == null || v.trim().isEmpty)
-                                  ? 'Please enter the skill you want in return'
+                                  ? 'Please enter the skill you want'
                                   : null,
                             )
                           : _inputField(
                               key: const ValueKey('custom'),
                               ctrl: _customOfferCtrl,
                               focus: _customOfferFocus,
-                              hint: 'Your Custom Offer (e.g. ₹200, Coffee)',
+                              hint: 'Your custom offer (e.g. ₹200, Coffee)',
                               icon: Icons.card_giftcard_rounded,
                               validator: (v) =>
                                   _exchangeType == 'custom' &&
@@ -311,21 +374,34 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                   : null,
                             ),
                     ).animate().fadeIn(delay: 120.ms),
-                    const SizedBox(height: 20),
-
-                    _sectionLabel('AVAILABILITY'),
                     const SizedBox(height: 10),
 
-                    _availabilityChips().animate().fadeIn(delay: 130.ms),
-                    const SizedBox(height: 20),
+                    // Open request toggle (compact)
+                    _openRequestTile().animate().fadeIn(delay: 130.ms),
+                    const SizedBox(height: 24),
 
-                    _sectionLabel('SESSION FORMAT'),
-                    const SizedBox(height: 10),
+                    // ── ADD TAGS ─────────────────────────────────────────
+                    _sectionHeader(Icons.label_outline_rounded, 'Add Tags'),
+                    const SizedBox(height: 12),
+                    _tagsSection().animate().fadeIn(delay: 140.ms),
+                    const SizedBox(height: 24),
 
-                    _sessionFormatRow().animate().fadeIn(delay: 140.ms),
-                    const SizedBox(height: 28),
+                    // ── AVAILABILITY ─────────────────────────────────────
+                    _sectionHeader(
+                      Icons.calendar_today_outlined,
+                      'Availability',
+                    ),
+                    const SizedBox(height: 12),
+                    _availabilitySection().animate().fadeIn(delay: 150.ms),
+                    const SizedBox(height: 24),
 
-                    _publishButton(isEdit).animate().fadeIn(delay: 160.ms),
+                    // ── SESSION FORMAT ───────────────────────────────────
+                    _sectionHeader(Icons.devices_rounded, 'Session Format'),
+                    const SizedBox(height: 12),
+                    _sessionFormatRow().animate().fadeIn(delay: 160.ms),
+                    const SizedBox(height: 32),
+
+                    _publishButton(isEdit).animate().fadeIn(delay: 180.ms),
                   ],
                 ),
               ),
@@ -337,7 +413,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   // ── App bar ───────────────────────────────────────────────────────────────
-  Widget _buildAppBar(bool isEdit, BuildContext context) {
+  Widget _buildAppBar(bool isEdit) {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
       decoration: const BoxDecoration(
@@ -353,7 +429,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           IconButton(
             icon: const Icon(
               Icons.chevron_left_rounded,
-              // FIX: was _textMain (non-const) — use literal white
               color: Colors.white,
               size: 28,
             ),
@@ -364,7 +439,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             child: Text(
               isEdit ? 'Edit Post' : 'Create Swap Post',
               style: GoogleFonts.dmSans(
-                // FIX: was _textMain (non-const) — use literal white
                 color: Colors.white,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -377,74 +451,623 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  // ── Section label ─────────────────────────────────────────────────────────
-  Widget _sectionLabel(String text) => Text(
-    text,
-    style: GoogleFonts.dmSans(
-      color: _textMain,
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.3,
-    ),
-  );
+  // ── OFFER / NEED toggle ───────────────────────────────────────────────────
+  Widget _modeToggle() {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: _inputBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border, width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _modeTile(true, 'I want to OFFER')),
+          Expanded(child: _modeTile(false, 'I need')),
+        ],
+      ),
+    );
+  }
 
-  // ── Open Request toggle ───────────────────────────────────────────────────
-  Widget _openRequestCard() {
+  Widget _modeTile(bool isOffer, String label) {
+    final active = _isOfferMode == isOffer;
+    return GestureDetector(
+      onTap: () => setState(() => _isOfferMode = isOffer),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          gradient: active
+              ? const LinearGradient(
+                  colors: [_purpleStart, _purpleEnd],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                )
+              : null,
+          color: active ? null : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: _purple.withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.dmSans(
+              color: active ? Colors.white : _textSub,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Section header ────────────────────────────────────────────────────────
+  Widget _sectionHeader(IconData icon, String title) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: _purple.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 15, color: _purple),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.dmSans(
+            color: _textMain,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Open Request compact tile ─────────────────────────────────────────────
+  Widget _openRequestTile() {
     return GestureDetector(
       onTap: () => setState(() => _isOpenRequest = !_isOpenRequest),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(14),
+          color: _isOpenRequest ? _purple.withOpacity(0.09) : _inputBg,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _isOpenRequest ? _purple.withOpacity(0.6) : _border,
-            width: _isOpenRequest ? 1.5 : 1,
+            color: _isOpenRequest ? _purple.withOpacity(0.5) : _border,
+            width: _isOpenRequest ? 1.5 : 1.2,
           ),
         ),
         child: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: _inputBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.help_outline_rounded,
-                color: _textSub,
-                size: 20,
-              ),
+            Icon(
+              Icons.public_rounded,
+              color: _isOpenRequest ? _purple : _textHint,
+              size: 18,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Open Request',
-                    style: GoogleFonts.dmSans(
-                      color: _textMain,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'Let others respond to your request',
-                    style: GoogleFonts.dmSans(color: _textSub, fontSize: 12),
-                  ),
-                ],
+              child: Text(
+                'Open Request – anyone can respond',
+                style: GoogleFonts.dmSans(
+                  color: _isOpenRequest ? _purple : _textSub,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             Switch.adaptive(
               value: _isOpenRequest,
               onChanged: (v) => setState(() => _isOpenRequest = v),
               activeColor: _purple,
-              activeTrackColor: _purple.withOpacity(0.35),
+              activeTrackColor: _purple.withOpacity(0.3),
               inactiveThumbColor: _textHint,
               inactiveTrackColor: _border,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Tags section ──────────────────────────────────────────────────────────
+  Widget _tagsSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border, width: 1.2),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tab row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(_tagTabs.length, (i) {
+                final active = _tagTabIdx == i;
+                return GestureDetector(
+                  onTap: () => setState(() => _tagTabIdx = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: active ? _purple : _inputBg,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: active ? _purple : _border,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Text(
+                      _tagTabs[i],
+                      style: GoogleFonts.dmSans(
+                        color: active ? Colors.white : _textSub,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Tag chips for current tab
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: (_tagOptions[_tagTabs[_tagTabIdx]] ?? []).map((tag) {
+              final selected = _selectedTags.contains(tag);
+              return GestureDetector(
+                onTap: () => setState(() {
+                  if (selected)
+                    _selectedTags.remove(tag);
+                  else
+                    _selectedTags.add(tag);
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected ? _purple.withOpacity(0.12) : _inputBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? _purple : _border,
+                      width: selected ? 1.5 : 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        tag,
+                        style: GoogleFonts.dmSans(
+                          color: selected ? _purple : _textSub,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (selected) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.check_rounded, color: _purple, size: 12),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+
+          // Custom tag input
+          Container(
+            decoration: BoxDecoration(
+              color: _inputBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _border, width: 1.2),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Icon(Icons.add_rounded, color: _textHint, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: TextField(
+                    controller: _customTagCtrl,
+                    style: GoogleFonts.dmSans(color: _textMain, fontSize: 13),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      fillColor: Colors.transparent,
+                      filled: true,
+                      focusColor: Colors.transparent,
+                      hoverColor: Colors.transparent,
+                      hintText: 'Add custom tag…',
+                      hintStyle: GoogleFonts.dmSans(
+                        color: _textHint,
+                        fontSize: 13,
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                    onSubmitted: (v) {
+                      final tag = v.trim();
+                      if (tag.isNotEmpty && !_customTags.contains(tag)) {
+                        setState(() {
+                          _customTags.add(tag);
+                          _customTagCtrl.clear();
+                        });
+                      }
+                    },
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    final tag = _customTagCtrl.text.trim();
+                    if (tag.isNotEmpty && !_customTags.contains(tag)) {
+                      setState(() {
+                        _customTags.add(tag);
+                        _customTagCtrl.clear();
+                      });
+                    }
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.all(5),
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_purpleStart, _purpleEnd],
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Custom tags preview
+          if (_customTags.isNotEmpty || _selectedTags.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ..._selectedTags.map(
+                  (t) => _tagPill(
+                    t,
+                    () => setState(() => _selectedTags.remove(t)),
+                  ),
+                ),
+                ..._customTags.map(
+                  (t) =>
+                      _tagPill(t, () => setState(() => _customTags.remove(t))),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _tagPill(String tag, VoidCallback onRemove) {
+    return Container(
+      padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+      decoration: BoxDecoration(
+        color: _purple.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _purple.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            tag,
+            style: GoogleFonts.dmSans(
+              color: _purple,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: _purple.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.close_rounded, size: 10, color: _purple),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Availability section ──────────────────────────────────────────────────
+  Widget _availabilitySection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border, width: 1.2),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Date range
+          Text(
+            'Date Range',
+            style: GoogleFonts.dmSans(
+              color: _textSub,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _datePicker(
+                  label: 'From',
+                  date: _fromDate,
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _fromDate ?? DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      builder: (ctx, child) => Theme(
+                        data: Theme.of(ctx).copyWith(
+                          colorScheme: ColorScheme.fromSeed(
+                            seedColor: _purple,
+                            brightness: _dark
+                                ? Brightness.dark
+                                : Brightness.light,
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (d != null) setState(() => _fromDate = d);
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 16,
+                  color: _textHint,
+                ),
+              ),
+              Expanded(
+                child: _datePicker(
+                  label: 'To',
+                  date: _toDate,
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: _toDate ?? (_fromDate ?? DateTime.now()),
+                      firstDate: _fromDate ?? DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      builder: (ctx, child) => Theme(
+                        data: Theme.of(ctx).copyWith(
+                          colorScheme: ColorScheme.fromSeed(
+                            seedColor: _purple,
+                            brightness: _dark
+                                ? Brightness.dark
+                                : Brightness.light,
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (d != null) setState(() => _toDate = d);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Days available
+          Text(
+            'Days Available',
+            style: GoogleFonts.dmSans(
+              color: _textSub,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: _weekDays.map((day) {
+              final sel = _selectedDays.contains(day);
+              return GestureDetector(
+                onTap: () => setState(() {
+                  if (sel)
+                    _selectedDays.remove(day);
+                  else
+                    _selectedDays.add(day);
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: sel ? _purple : _inputBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: sel ? _purple : _border,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      day,
+                      style: GoogleFonts.dmSans(
+                        color: sel ? Colors.white : _textSub,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+
+          // Preferred time
+          Text(
+            'Preferred Time',
+            style: GoogleFonts.dmSans(
+              color: _textSub,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _timeSlots.map((slot) {
+              final sel = _selectedTime == slot['label'];
+              return GestureDetector(
+                onTap: () =>
+                    setState(() => _selectedTime = sel ? null : slot['label']),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: sel ? _purple.withOpacity(0.12) : _inputBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: sel ? _purple : _border,
+                      width: sel ? 1.5 : 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(slot['icon']!, style: const TextStyle(fontSize: 13)),
+                      const SizedBox(width: 5),
+                      Text(
+                        slot['label']!,
+                        style: GoogleFonts.dmSans(
+                          color: sel ? _purple : _textSub,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _datePicker({
+    required String label,
+    required DateTime? date,
+    required VoidCallback onTap,
+  }) {
+    final hasDate = date != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: _inputBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: hasDate ? _purple.withOpacity(0.5) : _border,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_month_outlined,
+              size: 15,
+              color: hasDate ? _purple : _textHint,
+            ),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.dmSans(
+                    color: _textHint,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                Text(
+                  hasDate
+                      ? '${date!.day}/${date.month}/${date.year}'
+                      : 'Select',
+                  style: GoogleFonts.dmSans(
+                    color: hasDate ? _textMain : _textHint,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -463,6 +1086,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     String? Function(String?)? validator,
   }) {
     final focused = focus.hasFocus;
+    // Fill colour: stay the same on focus — no grey wash, no yellow line
+    final fill = _inputBg;
     return TextFormField(
       key: key,
       controller: ctrl,
@@ -475,7 +1100,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         hintText: hint,
         hintStyle: GoogleFonts.dmSans(color: _textHint, fontSize: 14.5),
         filled: true,
-        fillColor: _inputBg,
+        fillColor: fill,
+        // Remove the default focus overlay / splash tint
+        focusColor: Colors.transparent,
+        hoverColor: Colors.transparent,
         prefixIcon: Padding(
           padding: maxLines > 1
               ? const EdgeInsets.only(bottom: 40, left: 2)
@@ -487,6 +1115,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           horizontal: 14,
           vertical: 16,
         ),
+        // All border states use OutlineInputBorder so no underline ever shows
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(color: _border, width: 1.2),
@@ -495,16 +1124,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(color: _border, width: 1.2),
         ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(13)),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
+          borderSide: BorderSide(color: _border, width: 1.2),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(color: _purple, width: 1.6),
         ),
-        errorBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(13)),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(color: _errorRed, width: 1.2),
         ),
-        focusedErrorBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(13)),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(13),
           borderSide: BorderSide(color: _errorRed, width: 1.6),
         ),
         errorStyle: GoogleFonts.dmSans(color: _errorRed, fontSize: 11.5),
@@ -530,7 +1163,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             value: 'custom',
             emoji: '🎁',
             title: 'Custom',
-            subtitle: 'Money, treats...',
+            subtitle: 'Money, treats…',
           ),
         ),
       ],
@@ -597,55 +1230,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  // ── Availability chips ────────────────────────────────────────────────────
-  Widget _availabilityChips() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _availabilityOptions.map((option) {
-        final selected = _selectedAvailability.contains(option);
-        return GestureDetector(
-          onTap: () => setState(() {
-            if (selected) {
-              _selectedAvailability.remove(option);
-            } else {
-              _selectedAvailability.add(option);
-            }
-          }),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 170),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: selected ? _purple.withOpacity(0.15) : _inputBg,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: selected ? _purple : _border,
-                width: selected ? 1.5 : 1.2,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  option,
-                  style: GoogleFonts.dmSans(
-                    color: selected ? _purple : _textSub,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (selected) ...[
-                  const SizedBox(width: 4),
-                  const Icon(Icons.check_rounded, color: _purple, size: 13),
-                ],
-              ],
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 

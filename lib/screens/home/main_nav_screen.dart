@@ -100,13 +100,13 @@ class _BottomNav extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surfaceColor = isDark ? AppColors.darkSurface : AppColors.surface;
     final dividerColor = isDark ? AppColors.darkDivider : AppColors.divider;
-    final inactiveColor = isDark ? AppColors.darkTextLight : AppColors.textLight;
+    final inactiveColor = isDark
+        ? AppColors.darkTextLight
+        : AppColors.textLight;
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
-        border: Border(
-          top: BorderSide(color: dividerColor, width: 1),
-        ),
+        border: Border(top: BorderSide(color: dividerColor, width: 1)),
         boxShadow: AppShadows.bottomNav,
       ),
       child: SafeArea(
@@ -115,7 +115,13 @@ class _BottomNav extends StatelessWidget {
           height: 58,
           child: Row(
             children: [
-              _navItem(0, Icons.home_outlined, Icons.home_rounded, 'Home', inactiveColor),
+              _navItem(
+                0,
+                Icons.home_outlined,
+                Icons.home_rounded,
+                'Home',
+                inactiveColor,
+              ),
               _navItem(
                 1,
                 Icons.search_outlined,
@@ -139,7 +145,13 @@ class _BottomNav extends StatelessWidget {
     );
   }
 
-  Widget _navItem(int idx, IconData outline, IconData filled, String label, Color inactiveColor) {
+  Widget _navItem(
+    int idx,
+    IconData outline,
+    IconData filled,
+    String label,
+    Color inactiveColor,
+  ) {
     final active = currentIndex == idx;
     return Expanded(
       child: GestureDetector(
@@ -173,7 +185,6 @@ class _BottomNav extends StatelessWidget {
   }
 
   Widget _createBtn(Color inactiveColor) {
-    final active = currentIndex == 2;
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -183,22 +194,39 @@ class _BottomNav extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                active
-                    ? Icons.add_circle_rounded
-                    : Icons.add_circle_outline_rounded,
-                size: 25,
-                color: active ? AppColors.primary : inactiveColor,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5B4FE8), Color(0xFF7B6FF0)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6C63FF).withOpacity(0.45),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 160),
                 style: TextStyle(
                   fontSize: 10,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                  color: active ? AppColors.primary : inactiveColor,
+                  fontWeight: FontWeight.w600,
+                  color: inactiveColor,
                 ),
-                child: const Text('Post'),
+                child: const Text('Post Swap'),
               ),
             ],
           ),
