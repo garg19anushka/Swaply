@@ -256,38 +256,62 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Divider(color: _bd, height: 1),
                     const SizedBox(height: 14),
 
-                    // Stats
-                    Row(
+                    // Stats – 2×2 grid
+                    Column(
                       children: [
-                        _StatPanel(
-                          value: '${profile?.totalSwaps ?? 0}',
-                          label: 'Swaps done',
-                          sv: _sv,
-                          bd: _bd,
-                          tp: _tp,
-                          ts: _ts,
+                        Row(
+                          children: [
+                            _PointsPanel(
+                              totalSwaps: profile?.totalSwaps ?? 0,
+                              averageRating: profile?.averageRating ?? 0.0,
+                              sv: _sv,
+                              bd: _bd,
+                              tp: _tp,
+                              ts: _ts,
+                              d: _d,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const LeaderboardScreen(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _StatPanel(
+                              value: '${profile?.totalSwaps ?? 0}',
+                              label: 'Swaps done',
+                              sv: _sv,
+                              bd: _bd,
+                              tp: _tp,
+                              ts: _ts,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        _StatPanel(
-                          value: (profile?.averageRating ?? 0) > 0
-                              ? profile!.averageRating.toStringAsFixed(1)
-                              : '-',
-                          label: 'Avg rating',
-                          icon: Icons.star_rounded,
-                          iconColor: Colors.amber,
-                          sv: _sv,
-                          bd: _bd,
-                          tp: _tp,
-                          ts: _ts,
-                        ),
-                        const SizedBox(width: 8),
-                        _StatPanel(
-                          value: '$myPostCount',
-                          label: 'Active posts',
-                          sv: _sv,
-                          bd: _bd,
-                          tp: _tp,
-                          ts: _ts,
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _StatPanel(
+                              value: (profile?.averageRating ?? 0) > 0
+                                  ? profile!.averageRating.toStringAsFixed(1)
+                                  : '-',
+                              label: 'Avg rating',
+                              icon: Icons.star_rounded,
+                              iconColor: Colors.amber,
+                              sv: _sv,
+                              bd: _bd,
+                              tp: _tp,
+                              ts: _ts,
+                            ),
+                            const SizedBox(width: 8),
+                            _StatPanel(
+                              value: '$myPostCount',
+                              label: 'Active posts',
+                              sv: _sv,
+                              bd: _bd,
+                              tp: _tp,
+                              ts: _ts,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -2257,3 +2281,80 @@ Widget _empty(IconData icon, String msg, Color ts, Color tl) {
     ),
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _PointsPanel  (inline stat card – taps into leaderboard)
+// ─────────────────────────────────────────────────────────────────────────────
+class _PointsPanel extends StatelessWidget {
+  final int totalSwaps;
+  final double averageRating;
+  final bool d;
+  final Color sv, bd, tp, ts;
+  final VoidCallback onTap;
+
+  const _PointsPanel({
+    required this.totalSwaps,
+    required this.averageRating,
+    required this.d,
+    required this.sv,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+    required this.onTap,
+  });
+
+  int get _pts => (totalSwaps * 10 + (averageRating * 20)).round();
+
+  @override
+  Widget build(BuildContext context) {
+    const purple = Color(0xFF6C63FF);
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          decoration: BoxDecoration(
+            color: d ? const Color(0xFF1A1630) : const Color(0xFFF0EEFF),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: d ? purple.withOpacity(0.35) : purple.withOpacity(0.25),
+              width: 1.2,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('⚡', style: TextStyle(fontSize: 13)),
+                  const SizedBox(width: 3),
+                  Text(
+                    '$_pts',
+                    style: GoogleFonts.dmSans(
+                      color: purple,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Points',
+                style: GoogleFonts.dmSans(
+                  color: d ? purple.withOpacity(0.7) : purple.withOpacity(0.85),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
