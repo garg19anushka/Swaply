@@ -174,6 +174,7 @@ class AuthService extends ChangeNotifier {
               campus: _currentProfile!.campus,
               skillsOffered: _currentProfile!.skillsOffered,
               skillsWanted: _currentProfile!.skillsWanted,
+              links: _currentProfile!.links,
               avatarUrl: _currentProfile!.avatarUrl,
               totalSwaps: _currentProfile!.totalSwaps,
               averageRating: _currentProfile!.averageRating,
@@ -213,6 +214,7 @@ class AuthService extends ChangeNotifier {
     String? campus,
     List<String>? skillsOffered,
     List<String>? skillsWanted,
+    List<String>? links,
     String? avatarUrl,
     File? avatarFile,
   }) async {
@@ -244,6 +246,7 @@ class AuthService extends ChangeNotifier {
       if (campus != null) updates['campus'] = campus;
       if (skillsOffered != null) updates['skills_offered'] = skillsOffered;
       if (skillsWanted != null) updates['skills_wanted'] = skillsWanted;
+      if (links != null) updates['links'] = links;
       if (finalAvatarUrl != null) updates['avatar_url'] = finalAvatarUrl;
 
       final existing = await supabase
@@ -257,10 +260,26 @@ class AuthService extends ChangeNotifier {
             currentUser!.id.substring(0, 8);
         await supabase.from('profiles').insert(updates);
       } else {
-        await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', currentUser!.id);
+        try {
+          await supabase
+              .from('profiles')
+              .update(updates)
+              .eq('id', currentUser!.id);
+        } catch (e) {
+          // If 'links' column doesn't exist yet, retry without it
+          if (e.toString().contains('links') ||
+              e.toString().contains('column')) {
+            debugPrint('links column missing, retrying without it: $e');
+            final fallback = Map<String, dynamic>.from(updates)
+              ..remove('links');
+            await supabase
+                .from('profiles')
+                .update(fallback)
+                .eq('id', currentUser!.id);
+          } else {
+            rethrow;
+          }
+        }
       }
 
       await fetchProfile();

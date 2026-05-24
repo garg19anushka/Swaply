@@ -14,28 +14,31 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final _nameCtrl     = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
-  final _bioCtrl      = TextEditingController();
-  final _campusCtrl   = TextEditingController();
-  final _offerCtrl    = TextEditingController();
-  final _wantCtrl     = TextEditingController();
+  final _bioCtrl = TextEditingController();
+  final _campusCtrl = TextEditingController();
+  final _offerCtrl = TextEditingController();
+  final _wantCtrl = TextEditingController();
+
+  // ── Links ──────────────────────────────────────────────────────────────
+  final List<TextEditingController> _linkCtrls = [];
 
   bool _loading = false;
   File? _pickedImage;
 
   // ── Exact HTML palette ──────────────────────────────────────────────────
   // Dark background layers from the HTML :root variables
-  static const _bg      = Color(0xFF0C0D14); // --bg
-  static const _bg2     = Color(0xFF13141E); // --bg2  (card bg)
-  static const _bg3     = Color(0xFF1A1B28); // --bg3  (input bg)
-  static const _bd      = Color(0xFF272838); // --bd
-  static const _bd2     = Color(0xFF32334A); // --bd2
-  static const _tp      = Color(0xFFF0F0FA); // --tp   (primary text)
-  static const _ts      = Color(0xFF8A8CA8); // --ts   (secondary text)
-  static const _tl      = Color(0xFF4A4B62); // --tl   (label / hint)
-  static const _purple  = Color(0xFF7C5CFC); // --p
-  static const _pink    = Color(0xFFF0527A); // --pk
+  static const _bg = Color(0xFF0C0D14); // --bg
+  static const _bg2 = Color(0xFF13141E); // --bg2  (card bg)
+  static const _bg3 = Color(0xFF1A1B28); // --bg3  (input bg)
+  static const _bd = Color(0xFF272838); // --bd
+  static const _bd2 = Color(0xFF32334A); // --bd2
+  static const _tp = Color(0xFFF0F0FA); // --tp   (primary text)
+  static const _ts = Color(0xFF8A8CA8); // --ts   (secondary text)
+  static const _tl = Color(0xFF4A4B62); // --tl   (label / hint)
+  static const _purple = Color(0xFF7C5CFC); // --p
+  static const _pink = Color(0xFFF0527A); // --pk
 
   @override
   void initState() {
@@ -46,12 +49,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _populate() {
     final profile = context.read<AuthService>().currentProfile;
     if (profile == null) return;
-    _nameCtrl.text     = profile.fullName     ?? '';
-    _usernameCtrl.text = profile.username     ?? '';
-    _bioCtrl.text      = profile.bio          ?? '';
-    _campusCtrl.text   = profile.campus       ?? '';
-    _offerCtrl.text    = (profile.skillsOffered ?? []).join(', ');
-    _wantCtrl.text     = (profile.skillsWanted  ?? []).join(', ');
+    _nameCtrl.text = profile.fullName ?? '';
+    _usernameCtrl.text = profile.username ?? '';
+    _bioCtrl.text = profile.bio ?? '';
+    _campusCtrl.text = profile.campus ?? '';
+    _offerCtrl.text = (profile.skillsOffered ?? []).join(', ');
+    _wantCtrl.text = (profile.skillsWanted ?? []).join(', ');
+    // Populate links
+    for (final url in profile.links) {
+      _linkCtrls.add(TextEditingController(text: url));
+    }
+    if (_linkCtrls.isEmpty) {
+      _linkCtrls.add(TextEditingController()); // start with one empty
+    }
+    setState(() {});
   }
 
   @override
@@ -62,14 +73,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _campusCtrl.dispose();
     _offerCtrl.dispose();
     _wantCtrl.dispose();
+    for (final c in _linkCtrls) c.dispose();
     super.dispose();
   }
 
   // ── Pick image ─────────────────────────────────────────────────────────
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final xFile  = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    if (xFile != null && mounted) setState(() => _pickedImage = File(xFile.path));
+    final xFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (xFile != null && mounted)
+      setState(() => _pickedImage = File(xFile.path));
   }
 
   // ── Save ───────────────────────────────────────────────────────────────
@@ -77,27 +93,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _loading = true);
     try {
       final auth = context.read<AuthService>();
-      final offered = _offerCtrl.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      final wanted  = _wantCtrl.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      final offered = _offerCtrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final wanted = _wantCtrl.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final links = _linkCtrls
+          .map((c) => c.text.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       await auth.updateProfile(
-        fullName:      _nameCtrl.text.trim(),
-        username:      _usernameCtrl.text.trim(),
-        bio:           _bioCtrl.text.trim(),
-        campus:        _campusCtrl.text.trim(),
+        fullName: _nameCtrl.text.trim(),
+        username: _usernameCtrl.text.trim(),
+        bio: _bioCtrl.text.trim(),
+        campus: _campusCtrl.text.trim(),
         skillsOffered: offered,
-        skillsWanted:  wanted,
-        avatarFile:    _pickedImage,
+        skillsWanted: wanted,
+        links: links,
+        avatarFile: _pickedImage,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString(), style: GoogleFonts.dmSans(color: Colors.white)),
+            content: Text(
+              e.toString(),
+              style: GoogleFonts.dmSans(color: Colors.white),
+            ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -143,7 +177,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         title: Text(
           'Edit Profile',
           style: GoogleFonts.dmSans(
-            color: _tp, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3,
+            color: _tp,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
           ),
         ),
         centerTitle: true,
@@ -171,18 +208,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF5B52E8).withOpacity(0.35),
-                    blurRadius: 16, offset: const Offset(0, 6),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: _loading
-                  ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+                  ? const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    )
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.save_outlined, color: Colors.white, size: 18),
+                        const Icon(
+                          Icons.save_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
-                        Text('Save Changes', style: GoogleFonts.dmSans(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                        Text(
+                          'Save Changes',
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ],
                     ),
             ),
@@ -237,6 +295,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     label: 'Skills I Want (comma-separated)',
                     icon: Icons.search_rounded,
                   ),
+                  const SizedBox(height: 8),
+
+                  // ── Links Section ──────────────────────────────────
+                  _buildLinksSection(),
+
                   const SizedBox(height: 20),
                 ],
               ),
@@ -259,7 +322,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               // Avatar circle
               Container(
-                width: 88, height: 88,
+                width: 88,
+                height: 88,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _bg3,
@@ -269,27 +333,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child: _pickedImage != null
                       ? Image.file(_pickedImage!, fit: BoxFit.cover)
                       : (profile?.avatarUrl != null
-                          ? Image.network(
-                              profile!.avatarUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _initialsCircle(),
-                            )
-                          : _initialsCircle()),
+                            ? Image.network(
+                                profile!.avatarUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _initialsCircle(),
+                              )
+                            : _initialsCircle()),
                 ),
               ),
 
               // Camera badge
               Positioned(
-                bottom: 2, right: 2,
+                bottom: 2,
+                right: 2,
                 child: Container(
-                  width: 28, height: 28,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(colors: [_purple, _pink]),
                     border: Border.all(color: _bg, width: 2),
-                    boxShadow: [BoxShadow(color: _purple.withOpacity(0.4), blurRadius: 8)],
+                    boxShadow: [
+                      BoxShadow(color: _purple.withOpacity(0.4), blurRadius: 8),
+                    ],
                   ),
-                  child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
                 ),
               ),
             ],
@@ -307,7 +379,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _initialsCircle() => Center(
     child: Text(
       _initials(),
-      style: GoogleFonts.dmSans(color: _purple, fontSize: 28, fontWeight: FontWeight.w800),
+      style: GoogleFonts.dmSans(
+        color: _purple,
+        fontSize: 28,
+        fontWeight: FontWeight.w800,
+      ),
     ),
   );
 
@@ -332,7 +408,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           children: [
             // Floating label
             Positioned(
-              top: 8, left: 48,
+              top: 8,
+              left: 48,
               child: Text(
                 label,
                 style: GoogleFonts.dmSans(
@@ -345,7 +422,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             // Row with icon + field
             Row(
-              crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+              crossAxisAlignment: maxLines > 1
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
               children: [
                 Padding(
                   padding: EdgeInsets.only(
@@ -357,7 +436,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 22, bottom: 2, right: 14),
+                    padding: const EdgeInsets.only(
+                      top: 22,
+                      bottom: 2,
+                      right: 14,
+                    ),
                     child: Theme(
                       data: Theme.of(context).copyWith(
                         splashColor: Colors.transparent,
@@ -375,7 +458,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         autocorrect: false,
                         autofillHints: const [],
                         enableIMEPersonalizedLearning: false,
-                        style: GoogleFonts.dmSans(color: _tp, fontSize: 15, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.dmSans(
+                          color: _tp,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
                         decoration: InputDecoration(
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -386,7 +473,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           filled: true,
                           fillColor: Colors.transparent,
-                          hintStyle: GoogleFonts.dmSans(color: _tl, fontSize: 15),
+                          hintStyle: GoogleFonts.dmSans(
+                            color: _tl,
+                            fontSize: 15,
+                          ),
                         ),
                         cursorColor: _purple,
                       ),
@@ -399,5 +489,180 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  LINKS SECTION
+  // ════════════════════════════════════════════════════════════════════════
+  Widget _buildLinksSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _bg3,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _bd, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, color: _purple, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Links',
+                  style: GoogleFonts.dmSans(
+                    color: _purple,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Link rows
+          ..._linkCtrls.asMap().entries.map((entry) {
+            final i = entry.key;
+            final ctrl = entry.value;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              child: Row(
+                children: [
+                  // Link input
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _bg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _bd2, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child: Icon(
+                              Icons.link_rounded,
+                              color: _tl,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Theme(
+                              data: Theme.of(context).copyWith(
+                                textSelectionTheme: TextSelectionThemeData(
+                                  selectionColor: _purple.withOpacity(0.28),
+                                  cursorColor: _purple,
+                                  selectionHandleColor: _purple,
+                                ),
+                              ),
+                              child: TextField(
+                                controller: ctrl,
+                                keyboardType: TextInputType.url,
+                                autocorrect: false,
+                                autofillHints: const [AutofillHints.url],
+                                style: GoogleFonts.dmSans(
+                                  color: _tp,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  isCollapsed: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  hintText: 'https://',
+                                  hintStyle: GoogleFonts.dmSans(
+                                    color: _tl,
+                                    fontSize: 13,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.transparent,
+                                ),
+                                cursorColor: _purple,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Remove (×) button
+                  GestureDetector(
+                    onTap: () => _removeLink(i),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: _bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _bd2, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: _ts,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // Add another link button
+          GestureDetector(
+            onTap: _linkCtrls.length < 5 ? _addLink : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: _linkCtrls.length < 5 ? _purple : _tl,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _linkCtrls.length < 5
+                        ? '+ Add another link'
+                        : 'Max 5 links reached',
+                    style: GoogleFonts.dmSans(
+                      color: _linkCtrls.length < 5 ? _purple : _tl,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addLink() {
+    setState(() => _linkCtrls.add(TextEditingController()));
+  }
+
+  void _removeLink(int index) {
+    setState(() {
+      _linkCtrls[index].dispose();
+      _linkCtrls.removeAt(index);
+      if (_linkCtrls.isEmpty) {
+        _linkCtrls.add(TextEditingController()); // always keep at least one
+      }
+    });
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/chat_model.dart';
 import '../../models/profile_model.dart';
 import '../../services/auth_service.dart';
@@ -377,6 +379,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                           )
                           .toList(),
                     ).animate().fadeIn(delay: 120.ms),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // ── Links ───────────────────────────────────────────────
+                  if ((_profile?.links ?? []).isNotEmpty) ...[
+                    _sectionLabel('Links'),
+                    const SizedBox(height: 10),
+                    ...(_profile!.links.map(
+                      (url) => _LinkRow(
+                        url: url,
+                        d: _d,
+                        sf: _sf,
+                        bd: _bd,
+                        tp: _tp,
+                        ts: _ts,
+                      ),
+                    )).toList(),
                     const SizedBox(height: 20),
                   ],
 
@@ -889,6 +908,113 @@ class _ReviewTile extends StatelessWidget {
             style: GoogleFonts.dmSans(color: tl, fontSize: 10.5),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _LinkRow  – tappable link card for other users' profiles
+// ─────────────────────────────────────────────────────────────────────────────
+class _LinkRow extends StatelessWidget {
+  final String url;
+  final bool d;
+  final Color sf, bd, tp, ts;
+
+  const _LinkRow({
+    required this.url,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+  });
+
+  IconData _iconForUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('github')) return Icons.code_rounded;
+    if (lower.contains('linkedin')) return Icons.business_center_rounded;
+    if (lower.contains('twitter') || lower.contains('x.com'))
+      return Icons.alternate_email_rounded;
+    if (lower.contains('youtube')) return Icons.play_circle_outline_rounded;
+    if (lower.contains('instagram')) return Icons.photo_camera_outlined;
+    return Icons.link_rounded;
+  }
+
+  String _displayUrl(String url) {
+    return url
+        .replaceAll(RegExp(r'^https?://'), '')
+        .replaceAll(RegExp(r'^www\.'), '');
+  }
+
+  Future<void> _launch(BuildContext context) async {
+    final raw = url.trim();
+    final uri = Uri.tryParse(raw.startsWith('http') ? raw : 'https://$raw');
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await Clipboard.setData(ClipboardData(text: raw));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Link copied to clipboard',
+              style: GoogleFonts.dmSans(color: Colors.white),
+            ),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () => _launch(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: sf,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: bd, width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(_iconForUrl(url), size: 18, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _displayUrl(url),
+                  style: GoogleFonts.dmSans(
+                    color: AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                    decorationColor: AppColors.primary.withOpacity(0.4),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.open_in_new_rounded,
+                size: 14,
+                color: AppColors.primary.withOpacity(0.5),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

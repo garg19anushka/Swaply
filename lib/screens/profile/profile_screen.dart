@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/chat_model.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/auth_service.dart';
@@ -256,62 +258,54 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Divider(color: _bd, height: 1),
                     const SizedBox(height: 14),
 
-                    // Stats – 2×2 grid
-                    Column(
+                    // Stats – single row with all 4 boxes
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            _PointsPanel(
-                              totalSwaps: profile?.totalSwaps ?? 0,
-                              averageRating: profile?.averageRating ?? 0.0,
-                              sv: _sv,
-                              bd: _bd,
-                              tp: _tp,
-                              ts: _ts,
-                              d: _d,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const LeaderboardScreen(),
-                                ),
-                              ),
+                        _PointsPanel(
+                          totalSwaps: profile?.totalSwaps ?? 0,
+                          averageRating: profile?.averageRating ?? 0.0,
+                          sv: _sv,
+                          bd: _bd,
+                          tp: _tp,
+                          ts: _ts,
+                          d: _d,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LeaderboardScreen(),
                             ),
-                            const SizedBox(width: 8),
-                            _StatPanel(
-                              value: '${profile?.totalSwaps ?? 0}',
-                              label: 'Swaps done',
-                              sv: _sv,
-                              bd: _bd,
-                              tp: _tp,
-                              ts: _ts,
-                            ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _StatPanel(
-                              value: (profile?.averageRating ?? 0) > 0
-                                  ? profile!.averageRating.toStringAsFixed(1)
-                                  : '-',
-                              label: 'Avg rating',
-                              icon: Icons.star_rounded,
-                              iconColor: Colors.amber,
-                              sv: _sv,
-                              bd: _bd,
-                              tp: _tp,
-                              ts: _ts,
-                            ),
-                            const SizedBox(width: 8),
-                            _StatPanel(
-                              value: '$myPostCount',
-                              label: 'Active posts',
-                              sv: _sv,
-                              bd: _bd,
-                              tp: _tp,
-                              ts: _ts,
-                            ),
-                          ],
+                        const SizedBox(width: 8),
+                        _StatPanel(
+                          value: '${profile?.totalSwaps ?? 0}',
+                          label: 'Swaps done',
+                          sv: _sv,
+                          bd: _bd,
+                          tp: _tp,
+                          ts: _ts,
+                        ),
+                        const SizedBox(width: 8),
+                        _StatPanel(
+                          value: (profile?.averageRating ?? 0) > 0
+                              ? profile!.averageRating.toStringAsFixed(1)
+                              : '-',
+                          label: 'Avg rating',
+                          icon: Icons.star_rounded,
+                          iconColor: Colors.amber,
+                          sv: _sv,
+                          bd: _bd,
+                          tp: _tp,
+                          ts: _ts,
+                        ),
+                        const SizedBox(width: 8),
+                        _StatPanel(
+                          value: '$myPostCount',
+                          label: 'Active posts',
+                          sv: _sv,
+                          bd: _bd,
+                          tp: _tp,
+                          ts: _ts,
                         ),
                       ],
                     ),
@@ -353,6 +347,66 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ).animate().fadeIn(delay: 120.ms),
                 const SizedBox(height: 20),
               ],
+
+              // Links – always shown; empty state nudges user to add
+              _label('Links'),
+              const SizedBox(height: 10),
+              if ((profile?.links ?? []).isNotEmpty)
+                ...profile!.links
+                    .map(
+                      (url) => _LinkRow(
+                        url: url,
+                        d: _d,
+                        sf: _sf,
+                        bd: _bd,
+                        tp: _tp,
+                        ts: _ts,
+                      ),
+                    )
+                    .toList()
+              else
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const EditProfileScreen(),
+                    ),
+                  ).then((_) => context.read<AuthService>().fetchProfile()),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _sf,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.35),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.add_link_rounded,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Add your links (GitHub, LinkedIn…)',
+                          style: GoogleFonts.dmSans(
+                            color: AppColors.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
 
               // Recent reviews
               if (_ratings.isNotEmpty) ...[
@@ -2312,14 +2366,11 @@ class _PointsPanel extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
-            color: d ? const Color(0xFF1A1630) : const Color(0xFFF0EEFF),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: d ? purple.withOpacity(0.35) : purple.withOpacity(0.25),
-              width: 1.2,
-            ),
+            color: sv,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: bd, width: 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2333,20 +2384,20 @@ class _PointsPanel extends StatelessWidget {
                     '$_pts',
                     style: GoogleFonts.dmSans(
                       color: purple,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               Text(
                 'Points',
                 style: GoogleFonts.dmSans(
-                  color: d ? purple.withOpacity(0.7) : purple.withOpacity(0.85),
+                  color: ts,
                   fontSize: 10,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -2358,3 +2409,106 @@ class _PointsPanel extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _LinkRow  – displays a single link with icon, truncated URL, tap to open
+// ─────────────────────────────────────────────────────────────────────────────
+class _LinkRow extends StatelessWidget {
+  final String url;
+  final bool d;
+  final Color sf, bd, tp, ts;
+
+  const _LinkRow({
+    required this.url,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+  });
+
+  IconData _iconForUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('github')) return Icons.code_rounded;
+    if (lower.contains('linkedin')) return Icons.business_center_rounded;
+    if (lower.contains('twitter') || lower.contains('x.com'))
+      return Icons.alternate_email_rounded;
+    if (lower.contains('youtube')) return Icons.play_circle_outline_rounded;
+    if (lower.contains('instagram')) return Icons.photo_camera_outlined;
+    return Icons.link_rounded;
+  }
+
+  String _displayUrl(String url) {
+    return url
+        .replaceAll(RegExp(r'^https?://'), '')
+        .replaceAll(RegExp(r'^www\.'), '');
+  }
+
+  Future<void> _launch(BuildContext context) async {
+    final raw = url.trim();
+    final uri = Uri.tryParse(raw.startsWith('http') ? raw : 'https://$raw');
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      await Clipboard.setData(ClipboardData(text: raw));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Link copied to clipboard',
+              style: GoogleFonts.dmSans(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFF7C5CFC),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () => _launch(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: sf,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: bd, width: 1),
+          ),
+          child: Row(
+            children: [
+              Icon(_iconForUrl(url), size: 18, color: const Color(0xFF7C5CFC)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _displayUrl(url),
+                  style: GoogleFonts.dmSans(
+                    color: const Color(0xFF7C5CFC),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                    decorationColor: const Color(0xFF7C5CFC).withOpacity(0.4),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.open_in_new_rounded, size: 14, color: ts),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

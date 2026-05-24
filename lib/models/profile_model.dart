@@ -11,6 +11,7 @@ class ProfileModel {
   final String? campus;
   final List<String> skillsOffered;
   final List<String> skillsWanted;
+  final List<String> links;
   final int totalSwaps;
   final double averageRating;
   final int ratingCount;
@@ -40,6 +41,7 @@ class ProfileModel {
     this.campus,
     this.skillsOffered = const [],
     this.skillsWanted = const [],
+    this.links = const [],
     this.totalSwaps = 0,
     this.averageRating = 0.0,
     this.ratingCount = 0,
@@ -56,11 +58,13 @@ class ProfileModel {
       campus: json['campus'],
       skillsOffered: List<String>.from(json['skills_offered'] ?? []),
       skillsWanted: List<String>.from(json['skills_wanted'] ?? []),
+      links: List<String>.from(json['links'] ?? []),
       totalSwaps: json['total_swaps'] ?? 0,
       averageRating: (json['average_rating'] ?? 0.0).toDouble(),
       ratingCount: json['rating_count'] ?? 0,
       createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 
@@ -74,6 +78,7 @@ class ProfileModel {
       'campus': campus,
       'skills_offered': skillsOffered,
       'skills_wanted': skillsWanted,
+      'links': links,
     };
   }
 
@@ -84,6 +89,7 @@ class ProfileModel {
     String? campus,
     List<String>? skillsOffered,
     List<String>? skillsWanted,
+    List<String>? links,
   }) {
     return ProfileModel(
       id: id,
@@ -94,6 +100,7 @@ class ProfileModel {
       campus: campus ?? this.campus,
       skillsOffered: skillsOffered ?? this.skillsOffered,
       skillsWanted: skillsWanted ?? this.skillsWanted,
+      links: links ?? this.links,
       totalSwaps: totalSwaps,
       averageRating: averageRating,
       ratingCount: ratingCount,
