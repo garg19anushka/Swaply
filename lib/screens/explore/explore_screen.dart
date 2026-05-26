@@ -728,7 +728,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // ── Sticky header — matches feed header style ──────────────────
+          // ── Sticky header ──────────────────────────────────────────────
           SliverAppBar(
             pinned: true,
             backgroundColor: _sf,
@@ -749,7 +749,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
             actions: [
-              // Open Requests button
+              // ── Open Requests button (redesigned) ──────────────────
               GestureDetector(
                 onTap: () => Navigator.push(
                   context,
@@ -758,40 +758,100 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 child: Container(
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
+                    horizontal: 12,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: AppColors.warning.withOpacity(0.3),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C5CFC), Color(0xFF9B7FFF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF7C5CFC).withOpacity(0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.help_outline_rounded,
-                        size: 15,
-                        color: AppColors.warning,
+                      const Icon(
+                        Icons.inbox_rounded,
+                        size: 14,
+                        color: Colors.white,
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        'Open\nRequests',
-                        textAlign: TextAlign.center,
+                        'Requests',
                         style: GoogleFonts.dmSans(
-                          color: AppColors.warning,
-                          fontSize: 10,
+                          color: Colors.white,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          height: 1.2,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              // Notifications button
+
+              // ── Leaderboard button ─────────────────────────────────
+              GestureDetector(
+                onTap: () {
+                  // TODO: Navigate to LeaderboardScreen
+                  // Navigator.push(
+                  //   context,
+                  //   MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+                  // );
+                  HapticFeedback.selectionClick();
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFB830), Color(0xFFFF8C00)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFB830).withOpacity(0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.leaderboard_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Top',
+                        style: GoogleFonts.dmSans(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Notifications button ───────────────────────────────
               GestureDetector(
                 onTap: () => Navigator.push(
                   context,
@@ -925,7 +985,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 40.ms),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+          // ── Trending Skills ───────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: _TrendingSkills(
+              d: _d,
+              sv: _sv,
+              cb: _cb,
+              ce: _ce,
+              tp: _tp,
+              ts: _ts,
+              onTap: (skill) {
+                _searchCtrl.text = skill;
+                _search(skill);
+              },
+            ).animate().fadeIn(delay: 80.ms),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 4)),
 
           // ── Posts list — same SwapPostCard as feed ────────────────────
           Consumer<PostService>(
@@ -1434,13 +1510,126 @@ class _ExploreCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Helpers
+//  Trending Skills horizontal scroll row
+// ─────────────────────────────────────────────────────────────────────────────
+class _TrendingSkills extends StatelessWidget {
+  final bool d;
+  final Color sv, cb, ce, tp, ts;
+  final void Function(String skill) onTap;
+
+  const _TrendingSkills({
+    required this.d,
+    required this.sv,
+    required this.cb,
+    required this.ce,
+    required this.tp,
+    required this.ts,
+    required this.onTap,
+  });
+
+  static const _skills = [
+    (label: 'UI/UX Design', icon: Icons.design_services_rounded),
+    (label: 'Video Editing', icon: Icons.videocam_rounded),
+    (label: 'Photography', icon: Icons.camera_alt_outlined),
+    (label: 'Public Speaking', icon: Icons.mic_rounded),
+    (label: 'Excel', icon: Icons.table_chart_outlined),
+    (label: 'Python', icon: Icons.code_rounded),
+    (label: 'Music', icon: Icons.music_note_rounded),
+    (label: 'Writing', icon: Icons.edit_note_rounded),
+    (label: 'Figma', icon: Icons.palette_outlined),
+    (label: 'Data Analysis', icon: Icons.bar_chart_rounded),
+    (label: 'Marketing', icon: Icons.campaign_outlined),
+    (label: 'Finance', icon: Icons.attach_money_rounded),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final chipBg = d ? const Color(0xFF1A1A2E) : Colors.white;
+    final chipBd = d ? const Color(0xFF2A2A42) : const Color(0xFFE8E8F0);
+    final iconColor = const Color(0xFF7C5CFC);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Text(
+            'Trending Skills',
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 44,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            itemCount: _skills.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final skill = _skills[i];
+              return GestureDetector(
+                onTap: () => onTap(skill.label),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: chipBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: chipBd, width: 1),
+                    boxShadow: d
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(skill.icon, size: 15, color: iconColor),
+                      const SizedBox(width: 7),
+                      Text(
+                        skill.label,
+                        style: GoogleFonts.dmSans(
+                          color: tp,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _MiniBtn
 // ─────────────────────────────────────────────────────────────────────────────
 class _MiniBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+
   const _MiniBtn({
+    super.key,
     required this.icon,
     required this.color,
     required this.onTap,
@@ -1466,6 +1655,9 @@ class _MiniBtn extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  _ShimmerCard
+// ─────────────────────────────────────────────────────────────────────────────
 class _ShimmerCard extends StatelessWidget {
   final bool d;
   const _ShimmerCard({required this.d});
