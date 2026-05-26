@@ -8,15 +8,12 @@ import '../../models/swap_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/post_service.dart';
 import '../../services/swap_service.dart';
-import '../../services/ai_match_service.dart';
 import '../../services/leaderboard_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
 import '../../widgets/shimmer_card.dart';
-import '../../widgets/home_hero_card.dart';
 import '../notifications/notifications_screen.dart';
 import '../posts/post_detail_screen.dart';
-import '../posts/open_requests_screen.dart';
 import '../posts/create_post_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../swaps/all_swaps_screen.dart';
@@ -82,35 +79,7 @@ class _FeedScreenState extends State<FeedScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await context.read<PostService>().fetchPosts();
       await context.read<SwapService>().fetchActiveSwaps();
-      _triggerAiMatches();
     });
-  }
-
-  // ── AI match: derive skills from user's OWN posts, not ProfileModel ───────
-  void _triggerAiMatches() {
-    final auth = context.read<AuthService>();
-    final allPosts = context.read<PostService>().posts;
-    final myId = auth.currentUser?.id ?? '';
-    final campus = auth.currentProfile?.campus ?? 'Campus';
-    if (allPosts.isEmpty) return;
-
-    // Find what the current user offers/wants from their own posts
-    final myPosts = allPosts.where((p) => p.userId == myId).toList();
-    final mySkillOffered = myPosts.isNotEmpty
-        ? myPosts.first.skillOffered
-        : auth.currentProfile?.username ?? 'General';
-    final mySkillWanted = myPosts.isNotEmpty
-        ? (myPosts.first.skillWanted ?? 'Any skill')
-        : 'Any skill';
-
-    context.read<AiMatchService>().fetchMatches(
-      mySkillOffered: mySkillOffered,
-      mySkillWanted: mySkillWanted,
-      myCampus: campus,
-      myUserId: myId,
-      allPosts: allPosts,
-      maxResults: 5,
-    );
   }
 
   @override
@@ -290,14 +259,6 @@ class _FeedScreenState extends State<FeedScreen> {
 
                         const SizedBox(height: 10),
                         Divider(height: 1, thickness: 1, color: _bd),
-                        const SizedBox(height: 12),
-                        HomeHeroCard(
-                          onBrowse: () => widget.onSwitchTab?.call(1),
-                          onPostSkill: () => widget.onSwitchTab?.call(2),
-                          matchCount: 3,
-                          activeSwaps: 24,
-                        ),
-                        const SizedBox(height: 8),
                       ],
                     ),
                   ),
@@ -336,89 +297,6 @@ class _FeedScreenState extends State<FeedScreen> {
                       ],
                     ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.05);
                   },
-                ),
-              ),
-
-              // ══════════════════════════════════════════════════════
-              //  AI SMART MATCHES  – real AiMatchService data
-              // ══════════════════════════════════════════════════════
-              SliverToBoxAdapter(
-                child: Consumer<AiMatchService>(
-                  builder: (_, ai, __) {
-                    if (ai.isLoading) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _SectionHeader(
-                            title: '✨  Smart Matches',
-                            actionLabel: 'See all',
-                            onAction: () => widget.onSwitchTab?.call(1),
-                            dark: _d,
-                            tp: _tp,
-                          ),
-                          SizedBox(
-                            height: 200,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                              itemCount: 3,
-                              itemBuilder: (_, __) =>
-                                  _MatchCardSkeleton(dark: _d),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      );
-                    }
-                    if (!ai.hasMatches) return const SizedBox.shrink();
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionHeader(
-                          title: '✨  Smart Matches',
-                          actionLabel: 'See all',
-                          onAction: () => widget.onSwitchTab?.call(1),
-                          dark: _d,
-                          tp: _tp,
-                        ),
-                        SizedBox(
-                          height: 220,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                            itemCount: ai.matches.length,
-                            itemBuilder: (_, i) =>
-                                _MatchCard(
-                                      result: ai.matches[i],
-                                      dark: _d,
-                                      onTap: () =>
-                                          _openPostDetail(ai.matches[i].post),
-                                    )
-                                    .animate()
-                                    .fadeIn(
-                                      delay: Duration(milliseconds: i * 80),
-                                    )
-                                    .slideX(begin: 0.1),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    );
-                  },
-                ),
-              ),
-
-              // ══════════════════════════════════════════════════════
-              //  LEADERBOARD PREVIEW  – top 3 from LeaderboardService
-              // ══════════════════════════════════════════════════════
-              SliverToBoxAdapter(
-                child: _LeaderboardPreviewSection(
-                  dark: _d,
-                  tp: _tp,
-                  ts: _ts,
-                  bd: _bd,
-                  sv: _sv,
                 ),
               ),
 
@@ -810,197 +688,6 @@ class _ActiveSwapCard extends StatelessWidget {
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  AI Match Card
-// ─────────────────────────────────────────────────────────────────────────────
-class _MatchCard extends StatelessWidget {
-  final AiMatchResult result;
-  final bool dark;
-  final VoidCallback onTap;
-  const _MatchCard({
-    required this.result,
-    required this.dark,
-    required this.onTap,
-  });
-
-  static const _grads = [
-    [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
-    [Color(0xFF00C9A7), Color(0xFF4CC9F0)],
-    [Color(0xFFFFBE0B), Color(0xFFFF6B35)],
-    [Color(0xFF6C47FF), Color(0xFF00C9A7)],
-    [Color(0xFFFF4D6D), Color(0xFFFF9F43)],
-  ];
-
-  String get _initials {
-    final name =
-        result.post.profile?.fullName ?? result.post.profile?.username ?? '?';
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
-  }
-
-  List<Color> get _grad =>
-      _grads[_initials.isEmpty ? 0 : _initials.codeUnitAt(0) % _grads.length];
-
-  Color get _cardBg => dark ? const Color(0xFF111126) : Colors.white;
-  Color get _border => dark ? const Color(0xFF252540) : AppColors.border;
-  Color get _tp => dark ? const Color(0xFFF0F0FF) : AppColors.textPrimary;
-  Color get _ts => dark ? const Color(0xFF9090B0) : AppColors.textSecondary;
-
-  @override
-  Widget build(BuildContext context) {
-    final post = result.post;
-    final campus = post.profile?.campus ?? 'Campus';
-    final partnerName =
-        post.profile?.fullName?.split(' ').first ??
-        post.profile?.username ??
-        'User';
-    final score = result.matchScore;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 148,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: _cardBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _border),
-          boxShadow: dark
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.28),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : AppShadows.card,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: _grad,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Center(
-                  child: Text(
-                    _initials,
-                    style: GoogleFonts.dmSans(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              Text(
-                partnerName,
-                style: GoogleFonts.dmSans(
-                  color: _tp,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-
-              Text(
-                campus,
-                style: GoogleFonts.dmSans(color: _ts, fontSize: 11),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-
-              // Skill pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF4D6D).withOpacity(0.13),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: const Color(0xFFFF4D6D).withOpacity(0.35),
-                  ),
-                ),
-                child: Text(
-                  post.skillOffered.length > 12
-                      ? '${post.skillOffered.substring(0, 12)}…'
-                      : post.skillOffered,
-                  style: GoogleFonts.dmSans(
-                    color: dark
-                        ? const Color(0xFFFF7A9A)
-                        : const Color(0xFFCC2244),
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Match score
-              Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 12,
-                    color: Color(0xFF00C9A7),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$score% match',
-                    style: GoogleFonts.dmSans(
-                      color: const Color(0xFF00C9A7),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-
-              // Match bar
-              Container(
-                height: 3,
-                decoration: BoxDecoration(
-                  color: dark
-                      ? const Color(0xFF2A2A3E)
-                      : const Color(0xFFEEEEEE),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: score / 100,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00E5FF), Color(0xFF7C5CFC)],
-                      ),
-                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),

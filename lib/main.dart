@@ -8,7 +8,6 @@ import 'services/post_service.dart';
 import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/swap_service.dart';
-import 'services/ai_match_service.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 import 'services/leaderboard_service.dart';
@@ -53,7 +52,6 @@ class Swaply extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationService()),
         ChangeNotifierProvider(create: (_) => LeaderboardService()),
         ChangeNotifierProvider(create: (_) => SwapService()),
-        ChangeNotifierProvider(create: (_) => AiMatchService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (_, themeProvider, __) {
