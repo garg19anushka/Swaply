@@ -11,7 +11,7 @@ class SwapModel {
   final String? partnerName;
   final String? partnerUsername;
   final String? partnerAvatarUrl;
-  final String status; // 'active' | 'completed' | 'pending'
+  final String status; // 'active' | 'completed' | 'cancelled' | 'pending'
 
   const SwapModel({
     required this.id,
@@ -46,6 +46,10 @@ class SwapModel {
       status: map['status']?.toString() ?? 'active',
     );
   }
+
+  // alias so both fromMap and fromJson work
+  factory SwapModel.fromJson(Map<String, dynamic> json) =>
+      SwapModel.fromMap(json);
 
   Map<String, dynamic> toMap() => {
     'id': id,

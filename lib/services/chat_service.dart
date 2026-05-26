@@ -29,7 +29,9 @@ class ChatService extends ChangeNotifier {
       final existing = await supabase
           .from('chats')
           .select()
-          .or('and(participant_1.eq.$currentUserId,participant_2.eq.$otherUserId),and(participant_1.eq.$otherUserId,participant_2.eq.$currentUserId)')
+          .or(
+            'and(participant_1.eq.$currentUserId,participant_2.eq.$otherUserId),and(participant_1.eq.$otherUserId,participant_2.eq.$currentUserId)',
+          )
           .maybeSingle();
 
       if (existing != null) {
@@ -38,16 +40,22 @@ class ChatService extends ChangeNotifier {
             .select()
             .eq('id', otherUserId)
             .single();
-        return ChatModel.fromJson(existing,
-            otherUser: ProfileModel.fromJson(otherProfile));
+        return ChatModel.fromJson(
+          existing,
+          otherUser: ProfileModel.fromJson(otherProfile),
+        );
       }
 
       // Create new chat
-      final data = await supabase.from('chats').insert({
-        'participant_1': currentUserId,
-        'participant_2': otherUserId,
-        'post_id': postId,
-      }).select().single();
+      final data = await supabase
+          .from('chats')
+          .insert({
+            'participant_1': currentUserId,
+            'participant_2': otherUserId,
+            'post_id': postId,
+          })
+          .select()
+          .single();
 
       final otherProfile = await supabase
           .from('profiles')
@@ -55,8 +63,10 @@ class ChatService extends ChangeNotifier {
           .eq('id', otherUserId)
           .single();
 
-      return ChatModel.fromJson(data,
-          otherUser: ProfileModel.fromJson(otherProfile));
+      return ChatModel.fromJson(
+        data,
+        otherUser: ProfileModel.fromJson(otherProfile),
+      );
     } catch (e) {
       debugPrint('Error getting/creating chat: $e');
       return null;
@@ -89,8 +99,12 @@ class ChatService extends ChangeNotifier {
             .eq('id', otherUserId)
             .single();
 
-        chats.add(ChatModel.fromJson(chatJson,
-            otherUser: ProfileModel.fromJson(profileData)));
+        chats.add(
+          ChatModel.fromJson(
+            chatJson,
+            otherUser: ProfileModel.fromJson(profileData),
+          ),
+        );
       }
       _chats = chats;
     } catch (e) {
@@ -118,32 +132,35 @@ class ChatService extends ChangeNotifier {
 
   void subscribeToChat(String chatId) {
     _messageChannel?.unsubscribe();
-    _messageChannel = supabase.channel('chat_$chatId').onPostgresChanges(
-      event: PostgresChangeEvent.insert,
-      schema: 'public',
-      table: 'messages',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'chat_id',
-        value: chatId,
-      ),
-      callback: (payload) async {
-        final newMessage = payload.newRecord;
-        // Fetch with profile
-        try {
-          final data = await supabase
-              .from('messages')
-              .select('*, profiles(*)')
-              .eq('id', newMessage['id'])
-              .single();
-          final msg = MessageModel.fromJson(data);
-          _messages.add(msg);
-          notifyListeners();
-        } catch (e) {
-          debugPrint('Error fetching new message: $e');
-        }
-      },
-    ).subscribe();
+    _messageChannel = supabase
+        .channel('chat_$chatId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'chat_id',
+            value: chatId,
+          ),
+          callback: (payload) async {
+            final newMessage = payload.newRecord;
+            // Fetch with profile
+            try {
+              final data = await supabase
+                  .from('messages')
+                  .select('*, profiles(*)')
+                  .eq('id', newMessage['id'])
+                  .single();
+              final msg = MessageModel.fromJson(data);
+              _messages.add(msg);
+              notifyListeners();
+            } catch (e) {
+              debugPrint('Error fetching new message: $e');
+            }
+          },
+        )
+        .subscribe();
   }
 
   void unsubscribeFromChat() {
@@ -171,10 +188,13 @@ class ChatService extends ChangeNotifier {
       });
 
       // Update chat last message
-      await supabase.from('chats').update({
-        'last_message': messageType == 'image' ? '📷 Image' : content,
-        'last_message_at': DateTime.now().toIso8601String(),
-      }).eq('id', chatId);
+      await supabase
+          .from('chats')
+          .update({
+            'last_message': messageType == 'image' ? '📷 Image' : content,
+            'last_message_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', chatId);
 
       return true;
     } catch (e) {
@@ -185,10 +205,7 @@ class ChatService extends ChangeNotifier {
 
   Future<bool> deleteMessage(String messageId, String chatId) async {
     try {
-      await supabase
-          .from('messages')
-          .delete()
-          .eq('id', messageId);
+      await supabase.from('messages').delete().eq('id', messageId);
 
       _messages.removeWhere((m) => m.id == messageId);
       notifyListeners();
@@ -219,18 +236,22 @@ class ChatService extends ChangeNotifier {
     if (userId == null) return null;
 
     try {
-      final data = await supabase.from('swaps').insert({
-        'chat_id': chatId,
-        'post_id': postId,
-        'initiator_id': userId,
-        'receiver_id': otherUserId,
-        'status': 'pending',
-      }).select().single();
+      final data = await supabase
+          .from('swaps')
+          .insert({
+            'chat_id': chatId,
+            'post_id': postId,
+            'initiator_id': userId,
+            'receiver_id': otherUserId,
+            'status': 'pending',
+          })
+          .select()
+          .single();
 
-      await supabase.from('chats').update({
-        'swap_confirmed': true,
-        'swap_status': 'pending',
-      }).eq('id', chatId);
+      await supabase
+          .from('chats')
+          .update({'swap_confirmed': true, 'swap_status': 'pending'})
+          .eq('id', chatId);
 
       // Send system message
       await sendMessage(
@@ -248,14 +269,18 @@ class ChatService extends ChangeNotifier {
 
   Future<bool> markSwapCompleted(String swapId, String chatId) async {
     try {
-      await supabase.from('swaps').update({
-        'status': 'completed',
-        'completed_at': DateTime.now().toIso8601String(),
-      }).eq('id', swapId);
+      await supabase
+          .from('swaps')
+          .update({
+            'status': 'completed',
+            'completed_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', swapId);
 
-      await supabase.from('chats').update({
-        'swap_status': 'completed',
-      }).eq('id', chatId);
+      await supabase
+          .from('chats')
+          .update({'swap_status': 'completed'})
+          .eq('id', chatId);
 
       return true;
     } catch (e) {
@@ -276,6 +301,25 @@ class ChatService extends ChangeNotifier {
 
       return (data as List).map((s) => SwapModel.fromJson(s)).toList();
     } catch (e) {
+      return [];
+    }
+  }
+
+  Future<List<SwapModel>> fetchUserSwapsByStatus(String status) async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final data = await supabase
+          .from('swaps')
+          .select()
+          .or('initiator_id.eq.$userId,receiver_id.eq.$userId')
+          .eq('status', status)
+          .order('created_at', ascending: false);
+
+      return (data as List).map((s) => SwapModel.fromJson(s)).toList();
+    } catch (e) {
+      debugPrint('fetchUserSwapsByStatus error: $e');
       return [];
     }
   }
@@ -312,7 +356,8 @@ class ChatService extends ChangeNotifier {
     try {
       await supabase
           .from('messages')
-          .update({'is_starred': starred}).eq('id', messageId);
+          .update({'is_starred': starred})
+          .eq('id', messageId);
     } catch (e) {
       // revert on failure
       _messages[idx].isStarred = !starred;
@@ -330,7 +375,8 @@ class ChatService extends ChangeNotifier {
     try {
       await supabase
           .from('messages')
-          .update({'is_pinned': pinned}).eq('id', messageId);
+          .update({'is_pinned': pinned})
+          .eq('id', messageId);
     } catch (e) {
       _messages[idx].isPinned = !pinned;
       notifyListeners();
@@ -348,7 +394,8 @@ class ChatService extends ChangeNotifier {
     try {
       await supabase
           .from('messages')
-          .update({'reaction': emoji}).eq('id', messageId);
+          .update({'reaction': emoji})
+          .eq('id', messageId);
     } catch (e) {
       _messages[idx].reaction = prev;
       notifyListeners();

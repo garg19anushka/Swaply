@@ -53,14 +53,12 @@ class _ChatScreenState extends State<ChatScreen> {
   Color get _ts => _d ? const Color(0xFF8E9099) : const Color(0xFF6E6E6E);
   Color get _tl => _d ? const Color(0xFF555862) : const Color(0xFFAAAAAA);
 
-  // Outgoing: slate-blue gradient (dark) / primary violet-pink (light)
-  LinearGradient get _outGrad => _d
-      ? const LinearGradient(
-          colors: [Color(0xFF3B4EAD), Color(0xFF6C47FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        )
-      : AppColors.primaryGradient;
+  // Outgoing: app-blue gradient – same in both light and dark
+  LinearGradient get _outGrad => const LinearGradient(
+    colors: [Color(0xFF5B52E8), Color(0xFF7C5CFC)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   // Incoming: deep-lavender (dark) / pale lavender (light)
   Color get _inBg => _d ? const Color(0xFF262D3D) : const Color(0xFFF0EEFF);
@@ -1125,25 +1123,11 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: _bg,
         body: Column(
           children: [
-            // ── Gradient header (dark) / white (light) ─────────
+            // ── Header – theme-aware surface bar ───────────────
             Container(
               decoration: BoxDecoration(
-                gradient: _d
-                    ? const LinearGradient(
-                        colors: [Color(0xFF5B4FD9), Color(0xFF7C6FE0)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      )
-                    : null,
-                color: _d ? null : Colors.white,
-                border: _d
-                    ? null
-                    : const Border(
-                        bottom: BorderSide(
-                          color: Color(0xFFE0DEEE),
-                          width: 0.8,
-                        ),
-                      ),
+                color: _sf,
+                border: Border(bottom: BorderSide(color: _bd, width: 1)),
               ),
               child: SafeArea(
                 bottom: false,
@@ -1155,7 +1139,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       IconButton(
                         icon: Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: _d ? Colors.white : const Color(0xFF0D0C1E),
+                          color: _tp,
                           size: 19,
                         ),
                         onPressed: () => Navigator.pop(context),
@@ -1199,9 +1183,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 other?.fullName ?? other?.username ?? 'User',
                                 style: GoogleFonts.dmSans(
-                                  color: _d
-                                      ? Colors.white
-                                      : const Color(0xFF0D0C1E),
+                                  color: _tp,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 15,
                                 ),
@@ -1211,9 +1193,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 '@${other?.username ?? ''}',
                                 style: GoogleFonts.dmSans(
-                                  color: _d
-                                      ? Colors.white70
-                                      : const Color(0xFF6B698A),
+                                  color: _ts,
                                   fontSize: 11,
                                 ),
                               ),
@@ -1222,7 +1202,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
 
-                      // ── Schedule button (always visible) ─────────────
+                      // ── Schedule button ───────────────────────────────
                       GestureDetector(
                         onTap: _showScheduleSheet,
                         child: Container(
@@ -1231,14 +1211,10 @@ class _ChatScreenState extends State<ChatScreen> {
                             vertical: 7,
                           ),
                           decoration: BoxDecoration(
-                            color: _d
-                                ? Colors.white.withOpacity(0.15)
-                                : const Color(0xFF6C63FF).withOpacity(0.10),
+                            color: AppColors.primary.withOpacity(0.10),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: _d
-                                  ? Colors.white.withOpacity(0.35)
-                                  : const Color(0xFF6C63FF).withOpacity(0.45),
+                              color: AppColors.primary.withOpacity(0.35),
                               width: 1,
                             ),
                           ),
@@ -1250,9 +1226,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               Text(
                                 'Schedule',
                                 style: GoogleFonts.dmSans(
-                                  color: _d
-                                      ? Colors.white
-                                      : const Color(0xFF5B4FE8),
+                                  color: AppColors.primary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -2577,20 +2551,25 @@ class _InputBarState extends State<_InputBar> {
     final d = widget.d;
     final ts = widget.ts;
 
-    // Exact colours from screenshot
-    const barBg = Color(0xFF12151E); // near-black navy strip
-    const iconClr = Color(0xFF6C5FD9); // purple for image icon
-    const hintClr = Color(0xFF4A4D5A); // dim hint text
-    const sendClr = Color(0xFF6C5FD9); // solid purple circle
+    // Theme-aware colors
+    final barBg = d ? const Color(0xFF12151E) : Colors.white;
+    final barBorder = d ? const Color(0xFF2A2D36) : const Color(0xFFE0E0E8);
+    final inputBg = d ? const Color(0xFF1C2033) : const Color(0xFFF2F2F7);
+    final iconClr = AppColors.primary;
+    final hintClr = d ? const Color(0xFF4A4D5A) : const Color(0xFFAAAAAA);
+    final textClr = d ? Colors.white : const Color(0xFF0A0A0A);
 
     return Container(
-      color: barBg,
+      decoration: BoxDecoration(
+        color: barBg,
+        border: Border(top: BorderSide(color: barBorder, width: 1)),
+      ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Reply preview (unchanged) ─────────────────────
+            // ── Reply preview ─────────────────────────────────
             if (widget.replyTarget != null)
               Container(
                 width: double.infinity,
@@ -2642,17 +2621,14 @@ class _InputBarState extends State<_InputBar> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // ── Gradient rectangle input container ────
+                  // ── Input container ───────────────────────
                   Expanded(
                     child: Container(
                       height: 44,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1C2033), Color(0xFF252A3A)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
+                        color: inputBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: barBorder, width: 1),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2660,8 +2636,10 @@ class _InputBarState extends State<_InputBar> {
                           // Image icon — left
                           GestureDetector(
                             onTap: widget.onPickImage,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
                               child: Icon(
                                 Icons.image_outlined,
                                 color: iconClr,
@@ -2676,9 +2654,7 @@ class _InputBarState extends State<_InputBar> {
                               maxLines: 1,
                               textCapitalization: TextCapitalization.sentences,
                               style: GoogleFonts.dmSans(
-                                color: d
-                                    ? Colors.white
-                                    : const Color(0xFF0A0A0A),
+                                color: textClr,
                                 fontSize: 14,
                               ),
                               decoration: InputDecoration(

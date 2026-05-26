@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/chat_model.dart';
 import '../../providers/theme_provider.dart';
@@ -484,9 +485,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                       tl: _tl,
                     ),
                     _HistoryTab(
-                      swaps: _swaps,
-                      ratings: _ratings,
-                      isLoading: _loadingExtra,
                       d: _d,
                       sf: _sf,
                       sv: _sv,
@@ -1969,16 +1967,11 @@ class _BookmarksTab extends StatelessWidget {
   }
 }
 
-class _HistoryTab extends StatelessWidget {
-  final List<SwapModel> swaps;
-  final List<RatingModel> ratings;
-  final bool isLoading, d;
+class _HistoryTab extends StatefulWidget {
+  final bool d;
   final Color sf, sv, bd, tp, ts, tl;
 
   const _HistoryTab({
-    required this.swaps,
-    required this.ratings,
-    required this.isLoading,
     required this.d,
     required this.sf,
     required this.sv,
@@ -1989,57 +1982,187 @@ class _HistoryTab extends StatelessWidget {
   });
 
   @override
+  State<_HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends State<_HistoryTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tc;
+  List<SwapModel> _active = [];
+  List<SwapModel> _completed = [];
+  List<SwapModel> _cancelled = [];
+  bool _loading = true;
+  RealtimeChannel? _channel;
+
+  @override
+  void initState() {
+    super.initState();
+    _tc = TabController(length: 3, vsync: this);
+    _fetchAll();
+    _subscribeRealtime();
+  }
+
+  @override
+  void dispose() {
+    _tc.dispose();
+    _channel?.unsubscribe();
+    super.dispose();
+  }
+
+  Future<void> _fetchAll() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    final cs = context.read<ChatService>();
+    final results = await Future.wait([
+      cs.fetchUserSwapsByStatus('active'),
+      cs.fetchUserSwapsByStatus('completed'),
+      cs.fetchUserSwapsByStatus('cancelled'),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _active = results[0];
+      _completed = results[1];
+      _cancelled = results[2];
+      _loading = false;
+    });
+  }
+
+  void _subscribeRealtime() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    _channel = Supabase.instance.client
+        .channel('swaps_profile_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'swaps',
+          callback: (_) => _fetchAll(),
+        )
+        .subscribe();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isLoading)
+    if (_loading) {
       return Center(
         child: CircularProgressIndicator(
           color: AppColors.primary,
           strokeWidth: 2,
         ),
       );
-    if (swaps.isEmpty && ratings.isEmpty)
-      return _empty(Icons.history_rounded, 'No swap history yet', ts, tl);
-    return ListView(
-      padding: const EdgeInsets.only(top: 8),
+    }
+
+    return Column(
       children: [
-        if (swaps.isNotEmpty) ...[
-          Text(
-            'Swaps',
-            style: GoogleFonts.dmSans(
-              color: tp,
+        // ── Tab pills ────────────────────────────────────────────────────────
+        Container(
+          height: 40,
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: widget.sv,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TabBar(
+            controller: _tc,
+            indicator: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            dividerColor: Colors.transparent,
+            labelColor: Colors.white,
+            unselectedLabelColor: widget.ts,
+            labelStyle: GoogleFonts.dmSans(
+              fontSize: 12,
               fontWeight: FontWeight.w700,
-              fontSize: 14,
             ),
-          ),
-          const SizedBox(height: 8),
-          ...swaps.map(
-            (s) => _SwapTile(swap: s, d: d, sf: sf, bd: bd, tp: tp, ts: ts),
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (ratings.isNotEmpty) ...[
-          Text(
-            'Ratings Received',
-            style: GoogleFonts.dmSans(
-              color: tp,
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
+            unselectedLabelStyle: GoogleFonts.dmSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
+            padding: const EdgeInsets.all(4),
+            tabs: [
+              Tab(text: 'Active (${_active.length})'),
+              Tab(text: 'Completed (${_completed.length})'),
+              Tab(text: 'Cancelled (${_cancelled.length})'),
+            ],
           ),
-          const SizedBox(height: 8),
-          ...ratings.map(
-            (r) => _ReviewCard(
-              rating: r,
-              d: d,
-              sf: sf,
-              bd: bd,
-              tp: tp,
-              ts: ts,
-              tl: tl,
-            ),
+        ),
+
+        // ── Tab content ──────────────────────────────────────────────────────
+        Expanded(
+          child: TabBarView(
+            controller: _tc,
+            children: [
+              _SwapList(
+                swaps: _active,
+                emptyIcon: Icons.swap_horiz_rounded,
+                emptyMsg: 'No active swaps',
+                d: widget.d,
+                sf: widget.sf,
+                bd: widget.bd,
+                tp: widget.tp,
+                ts: widget.ts,
+                tl: widget.tl,
+              ),
+              _SwapList(
+                swaps: _completed,
+                emptyIcon: Icons.check_circle_outline_rounded,
+                emptyMsg: 'No completed swaps yet',
+                d: widget.d,
+                sf: widget.sf,
+                bd: widget.bd,
+                tp: widget.tp,
+                ts: widget.ts,
+                tl: widget.tl,
+              ),
+              _SwapList(
+                swaps: _cancelled,
+                emptyIcon: Icons.cancel_outlined,
+                emptyMsg: 'No cancelled swaps',
+                d: widget.d,
+                sf: widget.sf,
+                bd: widget.bd,
+                tp: widget.tp,
+                ts: widget.ts,
+                tl: widget.tl,
+              ),
+            ],
           ),
-        ],
+        ),
       ],
+    );
+  }
+}
+
+// ── List of swap tiles ────────────────────────────────────────────────────────
+class _SwapList extends StatelessWidget {
+  final List<SwapModel> swaps;
+  final IconData emptyIcon;
+  final String emptyMsg;
+  final bool d;
+  final Color sf, bd, tp, ts, tl;
+
+  const _SwapList({
+    required this.swaps,
+    required this.emptyIcon,
+    required this.emptyMsg,
+    required this.d,
+    required this.sf,
+    required this.bd,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (swaps.isEmpty) return _empty(emptyIcon, emptyMsg, ts, tl);
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 4),
+      itemCount: swaps.length,
+      itemBuilder: (_, i) =>
+          _SwapTile(swap: swaps[i], d: d, sf: sf, bd: bd, tp: tp, ts: ts),
     );
   }
 }
