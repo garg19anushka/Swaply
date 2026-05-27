@@ -17,30 +17,6 @@ import '../profile/user_profile_screen.dart';
 import '../../widgets/swap_post_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Category chip data
-// ─────────────────────────────────────────────────────────────────────────────
-class _Cat {
-  final String label;
-  final IconData icon;
-  const _Cat(this.label, this.icon);
-}
-
-const _cats = [
-  _Cat('Design', Icons.palette_outlined),
-  _Cat('Coding', Icons.code_rounded),
-  _Cat('Music', Icons.music_note_rounded),
-  _Cat('Writing', Icons.edit_note_rounded),
-  _Cat('Math', Icons.calculate_outlined),
-  _Cat('Language', Icons.translate_rounded),
-  _Cat('Photo', Icons.camera_alt_outlined),
-  _Cat('Cooking', Icons.restaurant_outlined),
-  _Cat('Fitness', Icons.fitness_center_rounded),
-  _Cat('Finance', Icons.attach_money_rounded),
-  _Cat('Business', Icons.business_center_outlined),
-  _Cat('DIY', Icons.handyman_outlined),
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
 //  Deterministic pastel gradients for grid cards
 // ─────────────────────────────────────────────────────────────────────────────
 const _cardGrads = [
@@ -68,14 +44,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   String _exchange = 'all';
-  String? _activeCat;
-  final Set<String> _activeFilters = {};
+  // null means "All" is active
+  String? _activeTrendingSkill;
   String _sortBy = 'newest';
   String _skillType = 'all';
   String _availability = 'all';
   String _sessionFormat = 'all';
 
-  // ── theme shortcuts — matches feed_screen tokens exactly ─────────────────
+  // ── theme shortcuts ──────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
   Color get _bg => _d ? const Color(0xFF0A0A14) : Colors.white;
   Color get _sf => _d ? const Color(0xFF0E0E1C) : Colors.white;
@@ -86,6 +62,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Color get _tl => _d ? const Color(0xFF555575) : AppColors.textLight;
   Color get _cb => _d ? const Color(0xFF1A1A2E) : const Color(0xFFF2F2F4);
   Color get _ce => _d ? const Color(0xFF252540) : AppColors.border;
+
+  static const _primaryPurple = Color(0xFF7C5CFC);
 
   @override
   void initState() {
@@ -109,19 +87,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  void _setExchange(String v) {
-    setState(() => _exchange = v);
-    context.read<PostService>().fetchPosts(
-      searchQuery: _query.isEmpty ? null : _query,
-      exchangeType: v == 'all' ? null : v,
-    );
+  // ── Tap a trending-skill chip ─────────────────────────────────────────
+  void _pickTrendingSkill(String? skill) {
+    setState(() => _activeTrendingSkill = skill);
+    if (skill == null) {
+      // "All" tapped — clear search
+      _searchCtrl.clear();
+      _search('');
+    } else {
+      _searchCtrl.text = skill;
+      _search(skill);
+    }
   }
 
-  // ── Local filter + sort applied only in this screen ───────────────────────
+  // ── Local filter + sort ───────────────────────────────────────────────
   List<PostModel> _filteredPosts(List<PostModel> raw) {
     List<PostModel> posts = List.of(raw);
 
-    // Skill Type
     if (_skillType != 'all') {
       const Map<String, Set<String>> _keywords = {
         'technical': {
@@ -212,7 +194,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       }
     }
 
-    // Availability
     if (_availability != 'all') {
       final now = DateTime.now();
       posts = posts.where((p) {
@@ -232,7 +213,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       }).toList();
     }
 
-    // Session Format
     if (_sessionFormat != 'all') {
       posts = posts.where((p) {
         final hay = '${p.title} ${p.description} ${p.tags.join(' ')}'
@@ -258,7 +238,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
       }).toList();
     }
 
-    // Sort
     switch (_sortBy) {
       case 'oldest':
         posts.sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -277,29 +256,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         );
         break;
-      default: // newest — already ordered from DB
+      default:
         break;
     }
 
     return posts;
   }
 
-  void _pickCat(String cat) {
-    final next = _activeCat == cat ? null : cat;
-    setState(() => _activeCat = next);
-    final kw = next ?? '';
-    _searchCtrl.text = kw;
-    _search(kw);
-  }
-
-  void _toggleFilter(String f) => setState(
-    () => _activeFilters.contains(f)
-        ? _activeFilters.remove(f)
-        : _activeFilters.add(f),
-  );
-
   void _showFilterSheet() {
-    // local copies so sheet is self-contained until Apply is tapped
     String localSort = _sortBy;
     String localExchange = _exchange;
     String localSkillType = _skillType;
@@ -315,10 +279,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
           final sheetBg = _d ? const Color(0xFF111126) : Colors.white;
           final rowBg = _d ? const Color(0xFF191932) : const Color(0xFFF5F5FA);
           final divClr = _d ? const Color(0xFF252545) : const Color(0xFFEAEAF0);
-          final activeClr = const Color(0xFF7C5CFC);
+          const activeClr = _primaryPurple;
 
-          // ── Radio-style row ──────────────────────────────────────────
-          Widget _radioRow({
+          Widget radioRow({
             required String label,
             required IconData icon,
             required bool active,
@@ -367,7 +330,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                       ),
                     ),
-                    // Radio circle
                     Container(
                       width: 22,
                       height: 22,
@@ -393,8 +355,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             );
           }
 
-          // ── Segment chip (exchange type / skill type) ─────────────────
-          Widget _segChip(String label, bool active, VoidCallback onTap) =>
+          Widget segChip(String label, bool active, VoidCallback onTap) =>
               GestureDetector(
                 onTap: () {
                   onTap();
@@ -425,8 +386,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               );
 
-          // ── Section label ─────────────────────────────────────────────
-          Widget _sectionLabel(String text) => Padding(
+          Widget sectionLabel(String text) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
               text,
@@ -439,8 +399,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           );
 
-          // ── Thin divider between radio rows ───────────────────────────
-          Widget _divider() => Container(height: 1, color: divClr);
+          Widget divider() => Container(height: 1, color: divClr);
 
           return Container(
             decoration: BoxDecoration(
@@ -460,7 +419,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle
                   Center(
                     child: Container(
                       width: 36,
@@ -472,8 +430,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-
-                  // Title row
                   Row(
                     children: [
                       Text(
@@ -513,35 +469,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Sort By ──────────────────────────────────────────
-                  _sectionLabel('Sort By'),
+                  sectionLabel('Sort By'),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Column(
                       children: [
-                        _radioRow(
+                        radioRow(
                           label: 'Newest First',
                           icon: Icons.arrow_downward_rounded,
                           active: localSort == 'newest',
                           onTap: () => localSort = 'newest',
                           isFirst: true,
                         ),
-                        _divider(),
-                        _radioRow(
+                        divider(),
+                        radioRow(
                           label: 'Oldest First',
                           icon: Icons.arrow_upward_rounded,
                           active: localSort == 'oldest',
                           onTap: () => localSort = 'oldest',
                         ),
-                        _divider(),
-                        _radioRow(
+                        divider(),
+                        radioRow(
                           label: 'Rating: High → Low',
                           icon: Icons.star_rounded,
                           active: localSort == 'rating_high',
                           onTap: () => localSort = 'rating_high',
                         ),
-                        _divider(),
-                        _radioRow(
+                        divider(),
+                        radioRow(
                           label: 'Rating: Low → High',
                           icon: Icons.star_outline_rounded,
                           active: localSort == 'rating_low',
@@ -553,33 +508,31 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Exchange Type ────────────────────────────────────
-                  _sectionLabel('Exchange Type'),
+                  sectionLabel('Exchange Type'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final rec in [
+                      for (final r in [
                         ('all', 'All'),
                         ('barter', 'Barter'),
                         ('custom', 'Custom'),
                       ])
-                        _segChip(
-                          rec.$2,
-                          localExchange == rec.$1,
-                          () => localExchange = rec.$1,
+                        segChip(
+                          r.$2,
+                          localExchange == r.$1,
+                          () => localExchange = r.$1,
                         ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Skill Type ───────────────────────────────────────
-                  _sectionLabel('Skill Type'),
+                  sectionLabel('Skill Type'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final rec in [
+                      for (final r in [
                         ('all', 'All Types'),
                         ('technical', 'Technical'),
                         ('creative', 'Creative'),
@@ -589,60 +542,57 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ('fitness', 'Fitness'),
                         ('business', 'Business'),
                       ])
-                        _segChip(
-                          rec.$2,
-                          localSkillType == rec.$1,
-                          () => localSkillType = rec.$1,
+                        segChip(
+                          r.$2,
+                          localSkillType == r.$1,
+                          () => localSkillType = r.$1,
                         ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Availability ─────────────────────────────────────
-                  _sectionLabel('Availability'),
+                  sectionLabel('Availability'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final rec in [
+                      for (final r in [
                         ('all', 'Any Time'),
                         ('now', 'Available Now'),
                         ('this_week', 'This Week'),
                         ('weekends', 'Weekends'),
                         ('evenings', 'Evenings'),
                       ])
-                        _segChip(
-                          rec.$2,
-                          localAvailability == rec.$1,
-                          () => localAvailability = rec.$1,
+                        segChip(
+                          r.$2,
+                          localAvailability == r.$1,
+                          () => localAvailability = r.$1,
                         ),
                     ],
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Session Format ───────────────────────────────────
-                  _sectionLabel('Session Format'),
+                  sectionLabel('Session Format'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final rec in [
+                      for (final r in [
                         ('all', 'Any Format'),
                         ('online', 'Online'),
                         ('in_person', 'In Person'),
                         ('hybrid', 'Hybrid'),
                         ('async', 'Async / Self-paced'),
                       ])
-                        _segChip(
-                          rec.$2,
-                          localSessionFormat == rec.$1,
-                          () => localSessionFormat = rec.$1,
+                        segChip(
+                          r.$2,
+                          localSessionFormat == r.$1,
+                          () => localSessionFormat = r.$1,
                         ),
                     ],
                   ),
                   const SizedBox(height: 24),
 
-                  // ── Apply button — flat purple like screenshot ────────
                   GestureDetector(
                     onTap: () {
                       setState(() {
@@ -662,7 +612,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF7C5CFC),
+                        color: _primaryPurple,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -719,6 +669,32 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  // ── Reusable square icon button (like the notification button) ───────────
+  Widget _headerIconBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    Widget? badge,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: _d ? AppColors.darkSurfaceVariant : const Color(0xFFF2F2F4),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(icon, size: 19, color: _tp),
+            if (badge != null) Positioned(top: 6, right: 6, child: badge),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final myId = context.watch<AuthService>().currentUser?.id;
@@ -728,7 +704,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // ── Sticky header ──────────────────────────────────────────────
+          // ── App bar ──────────────────────────────────────────────────────
           SliverAppBar(
             pinned: true,
             backgroundColor: _sf,
@@ -749,133 +725,47 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
             actions: [
-              // ── Open Requests button (redesigned) ──────────────────
-              GestureDetector(
+              // ── Requests button (square, like notification) ─────────────
+              _headerIconBtn(
+                icon: Icons.inbox_outlined,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const OpenRequestsScreen()),
                 ),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF7C5CFC), Color(0xFF9B7FFF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(11),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF7C5CFC).withOpacity(0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.inbox_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Requests',
-                        style: GoogleFonts.dmSans(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-
-              // ── Leaderboard button ─────────────────────────────────
-              GestureDetector(
+              const SizedBox(width: 8),
+              // ── Leaderboard / Top button ────────────────────────────────
+              _headerIconBtn(
+                icon: Icons.leaderboard_outlined,
                 onTap: () {
-                  // TODO: Navigate to LeaderboardScreen
-                  // Navigator.push(
-                  //   context,
-                  //   MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
-                  // );
-                  HapticFeedback.selectionClick();
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFB830), Color(0xFFFF8C00)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                  // TODO: navigate to leaderboard screen when available
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Leaderboard coming soon!',
+                        style: GoogleFonts.dmSans(),
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      duration: const Duration(seconds: 2),
                     ),
-                    borderRadius: BorderRadius.circular(11),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFFB830).withOpacity(0.35),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.leaderboard_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Top',
-                        style: GoogleFonts.dmSans(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                  );
+                },
               ),
-
-              // ── Notifications button ───────────────────────────────
-              GestureDetector(
+              const SizedBox(width: 8),
+              // ── Notifications button ─────────────────────────────────────
+              _headerIconBtn(
+                icon: Icons.notifications_outlined,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => const NotificationsScreen(),
                   ),
                 ),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  margin: const EdgeInsets.only(right: 16),
-                  decoration: BoxDecoration(
-                    color: _d
-                        ? AppColors.darkSurfaceVariant
-                        : const Color(0xFFF2F2F4),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(
-                    Icons.notifications_outlined,
-                    size: 19,
-                    color: _tp,
-                  ),
-                ),
               ),
+              const SizedBox(width: 16),
             ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
@@ -885,7 +775,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-          // ── Search bar with filter icon ────────────────────────────────
+          // ── Search bar ────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -906,7 +796,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           Expanded(
                             child: TextField(
                               controller: _searchCtrl,
-                              onChanged: _search,
+                              onChanged: (q) {
+                                // If user types manually, deselect trending chip
+                                if (_activeTrendingSkill != null &&
+                                    q != _activeTrendingSkill) {
+                                  setState(() => _activeTrendingSkill = null);
+                                }
+                                _search(q);
+                              },
                               style: GoogleFonts.dmSans(
                                 color: _tp,
                                 fontSize: 14,
@@ -931,7 +828,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               onTap: () {
                                 _searchCtrl.clear();
                                 _search('');
-                                setState(() => _activeCat = null);
+                                setState(() => _activeTrendingSkill = null);
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(11),
@@ -985,25 +882,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 40.ms),
           ),
 
-          // ── Trending Skills ───────────────────────────────────────────────
+          // ── Trending Skills (with "All" chip) ─────────────────────────────
           SliverToBoxAdapter(
             child: _TrendingSkills(
               d: _d,
-              sv: _sv,
-              cb: _cb,
-              ce: _ce,
               tp: _tp,
               ts: _ts,
-              onTap: (skill) {
-                _searchCtrl.text = skill;
-                _search(skill);
-              },
+              activeSkill: _activeTrendingSkill,
+              onTap: _pickTrendingSkill,
             ).animate().fadeIn(delay: 80.ms),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 4)),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-          // ── Posts list — same SwapPostCard as feed ────────────────────
+          // ── Posts list ────────────────────────────────────────────────────
           Consumer<PostService>(
             builder: (_, ps, __) {
               if (ps.isLoading && ps.posts.isEmpty) {
@@ -1022,11 +914,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 return SliverFillRemaining(child: _empty());
               }
 
+              final filtered = _filteredPosts(ps.posts);
+
+              if (filtered.isEmpty) {
+                return SliverFillRemaining(child: _empty());
+              }
+
               return SliverPadding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 100),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((_, i) {
-                    final p = ps.posts[i];
+                    final p = filtered[i];
                     return SwapPostCard(
                           key: ValueKey(p.id),
                           post: p,
@@ -1068,7 +966,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           delay: Duration(milliseconds: i * 40),
                           curve: Curves.easeOutCubic,
                         );
-                  }, childCount: ps.posts.length),
+                  }, childCount: filtered.length),
                 ),
               );
             },
@@ -1114,7 +1012,154 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  _ExploreCard  –  2-col grid card (no Swap button — never had one)
+//  _TrendingSkills  — horizontal scroll with "All" chip at front
+// ─────────────────────────────────────────────────────────────────────────────
+class _TrendingSkills extends StatelessWidget {
+  final bool d;
+  final Color tp, ts;
+  // null = "All" is active
+  final String? activeSkill;
+  final void Function(String? skill) onTap;
+
+  const _TrendingSkills({
+    required this.d,
+    required this.tp,
+    required this.ts,
+    required this.activeSkill,
+    required this.onTap,
+  });
+
+  static const _skills = [
+    (label: 'UI/UX Design', icon: Icons.design_services_rounded),
+    (label: 'Video Editing', icon: Icons.videocam_rounded),
+    (label: 'Photography', icon: Icons.camera_alt_outlined),
+    (label: 'Public Speaking', icon: Icons.mic_rounded),
+    (label: 'Excel', icon: Icons.table_chart_outlined),
+    (label: 'Python', icon: Icons.code_rounded),
+    (label: 'Music', icon: Icons.music_note_rounded),
+    (label: 'Writing', icon: Icons.edit_note_rounded),
+    (label: 'Figma', icon: Icons.palette_outlined),
+    (label: 'Data Analysis', icon: Icons.bar_chart_rounded),
+    (label: 'Marketing', icon: Icons.campaign_outlined),
+    (label: 'Finance', icon: Icons.attach_money_rounded),
+  ];
+
+  static const _purple = Color(0xFF7C5CFC);
+
+  Widget _chip({
+    required bool d,
+    required Color tp,
+    required bool active,
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final chipBg = active
+        ? _purple
+        : (d ? const Color(0xFF1A1A2E) : Colors.white);
+    final chipBd = active
+        ? _purple
+        : (d ? const Color(0xFF2A2A42) : const Color(0xFFE8E8F0));
+    final iconColor = active ? Colors.white : _purple;
+    final textColor = active ? Colors.white : tp;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: chipBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: chipBd, width: 1),
+          boxShadow: d
+              ? []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(active ? 0.12 : 0.06),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: iconColor),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                color: textColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Text(
+            'Trending Skills',
+            style: GoogleFonts.dmSans(
+              color: tp,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            children: [
+              // ── "All" chip first ─────────────────────────────────────
+              _chip(
+                d: d,
+                tp: tp,
+                active: activeSkill == null,
+                label: 'All',
+                icon: Icons.apps_rounded,
+                onTap: () => onTap(null),
+              ),
+              const SizedBox(width: 8),
+              // ── Skill chips ──────────────────────────────────────────
+              ..._skills.map(
+                (skill) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _chip(
+                    d: d,
+                    tp: tp,
+                    active: activeSkill == skill.label,
+                    label: skill.label,
+                    icon: skill.icon,
+                    onTap: () => onTap(skill.label),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _ExploreCard  –  2-col grid card
 // ─────────────────────────────────────────────────────────────────────────────
 class _ExploreCard extends StatelessWidget {
   final PostModel post;
@@ -1182,7 +1227,6 @@ class _ExploreCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Gradient header
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
@@ -1328,8 +1372,6 @@ class _ExploreCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Author
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 8, 9, 0),
               child: GestureDetector(
@@ -1376,8 +1418,6 @@ class _ExploreCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Title
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 5, 9, 0),
               child: Text(
@@ -1392,10 +1432,7 @@ class _ExploreCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-
             const Spacer(),
-
-            // Offering / Wants strip
             Container(
               margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -1505,117 +1542,6 @@ class _ExploreCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Trending Skills horizontal scroll row
-// ─────────────────────────────────────────────────────────────────────────────
-class _TrendingSkills extends StatelessWidget {
-  final bool d;
-  final Color sv, cb, ce, tp, ts;
-  final void Function(String skill) onTap;
-
-  const _TrendingSkills({
-    required this.d,
-    required this.sv,
-    required this.cb,
-    required this.ce,
-    required this.tp,
-    required this.ts,
-    required this.onTap,
-  });
-
-  static const _skills = [
-    (label: 'UI/UX Design', icon: Icons.design_services_rounded),
-    (label: 'Video Editing', icon: Icons.videocam_rounded),
-    (label: 'Photography', icon: Icons.camera_alt_outlined),
-    (label: 'Public Speaking', icon: Icons.mic_rounded),
-    (label: 'Excel', icon: Icons.table_chart_outlined),
-    (label: 'Python', icon: Icons.code_rounded),
-    (label: 'Music', icon: Icons.music_note_rounded),
-    (label: 'Writing', icon: Icons.edit_note_rounded),
-    (label: 'Figma', icon: Icons.palette_outlined),
-    (label: 'Data Analysis', icon: Icons.bar_chart_rounded),
-    (label: 'Marketing', icon: Icons.campaign_outlined),
-    (label: 'Finance', icon: Icons.attach_money_rounded),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final chipBg = d ? const Color(0xFF1A1A2E) : Colors.white;
-    final chipBd = d ? const Color(0xFF2A2A42) : const Color(0xFFE8E8F0);
-    final iconColor = const Color(0xFF7C5CFC);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-          child: Text(
-            'Trending Skills',
-            style: GoogleFonts.dmSans(
-              color: tp,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            physics: const BouncingScrollPhysics(),
-            itemCount: _skills.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final skill = _skills[i];
-              return GestureDetector(
-                onTap: () => onTap(skill.label),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: chipBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: chipBd, width: 1),
-                    boxShadow: d
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(skill.icon, size: 15, color: iconColor),
-                      const SizedBox(width: 7),
-                      Text(
-                        skill.label,
-                        style: GoogleFonts.dmSans(
-                          color: tp,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 4),
-      ],
     );
   }
 }
