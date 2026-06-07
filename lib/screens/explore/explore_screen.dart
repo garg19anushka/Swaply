@@ -17,8 +17,61 @@ import '../profile/user_profile_screen.dart';
 import '../../widgets/swap_post_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Deterministic pastel gradients for grid cards
+//  Category chip data  (top pill row: All / Design / Coding …)
 // ─────────────────────────────────────────────────────────────────────────────
+class _Cat {
+  final String label;
+  final IconData icon;
+  const _Cat(this.label, this.icon);
+}
+
+const _cats = [
+  _Cat('All', Icons.apps_rounded),
+  _Cat('Design', Icons.palette_outlined),
+  _Cat('Coding', Icons.code_rounded),
+  _Cat('Music', Icons.music_note_rounded),
+  _Cat('Writing', Icons.edit_note_rounded),
+  _Cat('Math', Icons.calculate_outlined),
+  _Cat('Language', Icons.translate_rounded),
+  _Cat('Photo', Icons.camera_alt_outlined),
+  _Cat('Fitness', Icons.fitness_center_rounded),
+  _Cat('Finance', Icons.attach_money_rounded),
+  _Cat('Business', Icons.business_center_outlined),
+  _Cat('DIY', Icons.handyman_outlined),
+];
+
+// Exchange-type filter options (second pill row)
+const _exchangeTypes = [
+  (value: 'all', label: 'All Types', icon: Icons.swap_horiz_rounded),
+  (value: 'barter', label: 'Barter', icon: Icons.sync_alt_rounded),
+  (value: 'open_request', label: 'Open Req', icon: Icons.lock_open_rounded),
+  (value: 'custom', label: 'Custom', icon: Icons.auto_awesome_rounded),
+];
+
+// Trending skills row (shown below search bar)
+class _Trend {
+  final String label;
+  final IconData icon;
+  const _Trend(this.label, this.icon);
+}
+
+const _trends = [
+  _Trend('All', Icons.apps_rounded),
+  _Trend('UI/UX Design', Icons.design_services_outlined),
+  _Trend('Video Editing', Icons.video_camera_back_outlined),
+  _Trend('Photography', Icons.camera_alt_outlined),
+  _Trend('Public Speaking', Icons.mic_none_rounded),
+  _Trend('Excel', Icons.table_chart_outlined),
+  _Trend('Python', Icons.code_rounded),
+  _Trend('Music', Icons.music_note_rounded),
+  _Trend('Writing', Icons.edit_note_rounded),
+  _Trend('Figma', Icons.brush_outlined),
+  _Trend('Data Analysis', Icons.bar_chart_rounded),
+  _Trend('Marketing', Icons.campaign_outlined),
+  _Trend('Finance', Icons.attach_money_rounded),
+];
+
+// Grid card gradients
 const _cardGrads = [
   [Color(0xFFBBDEFB), Color(0xFF90CAF9)],
   [Color(0xFFF8BBD0), Color(0xFFF48FB1)],
@@ -27,13 +80,12 @@ const _cardGrads = [
   [Color(0xFFFFE0B2), Color(0xFFFFCC80)],
   [Color(0xFFE1BEE7), Color(0xFFCE93D8)],
 ];
-
 List<Color> _gradFor(PostModel p) =>
     _cardGrads[p.skillOffered.length % _cardGrads.length];
 
-// ═══════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
 //  ExploreScreen
-// ═══════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
   @override
@@ -43,15 +95,16 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
-  String _exchange = 'all';
-  // null means "All" is active
-  String? _activeTrendingSkill;
+  String _activeTrend = 'All'; // trending skills row
+  String _activeCat = 'All';
+  String _exchangeType = 'all';
   String _sortBy = 'newest';
   String _skillType = 'all';
   String _availability = 'all';
   String _sessionFormat = 'all';
+  bool _isGridView = false;
 
-  // ── theme shortcuts ──────────────────────────────────────────────────────
+  // ── theme ─────────────────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
   Color get _bg => _d ? const Color(0xFF0A0A14) : Colors.white;
   Color get _sf => _d ? const Color(0xFF0E0E1C) : Colors.white;
@@ -63,8 +116,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Color get _cb => _d ? const Color(0xFF1A1A2E) : const Color(0xFFF2F2F4);
   Color get _ce => _d ? const Color(0xFF252540) : AppColors.border;
 
-  static const _primaryPurple = Color(0xFF7C5CFC);
+  // chip colours (inactive) — used by both chip rows
+  Color get _chipBg => _d ? const Color(0xFF13132A) : const Color(0xFFF0F0F8);
+  Color get _chipBd => _d ? const Color(0xFF2A2A45) : const Color(0xFFDDDDEE);
 
+  static const _purple = Color(0xFF7C5CFC);
+
+  // ── init / dispose ────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -79,37 +137,60 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.dispose();
   }
 
+  // ── data methods ──────────────────────────────────────────────────────────
   void _search(String q) {
     setState(() => _query = q);
-    context.read<PostService>().fetchPosts(
-      searchQuery: q.isEmpty ? null : q,
-      exchangeType: _exchange == 'all' ? null : _exchange,
-    );
+    _refetch();
   }
 
-  // ── Tap a trending-skill chip ─────────────────────────────────────────
-  void _pickTrendingSkill(String? skill) {
-    setState(() => _activeTrendingSkill = skill);
-    if (skill == null) {
-      // "All" tapped — clear search
+  void _setCat(String cat) {
+    setState(() {
+      _activeCat = cat;
+      _activeTrend = 'All'; // deselect trend when category is picked
+    });
+    if (cat == 'All') {
       _searchCtrl.clear();
       _search('');
     } else {
-      _searchCtrl.text = skill;
-      _search(skill);
+      _searchCtrl.text = cat;
+      _search(cat);
     }
   }
 
-  // ── Local filter + sort ───────────────────────────────────────────────
+  void _setTrend(String trend) {
+    setState(() => _activeTrend = trend);
+    if (trend == 'All') {
+      _searchCtrl.clear();
+      _search('');
+      setState(() => _activeCat = 'All');
+    } else {
+      _searchCtrl.text = trend;
+      _search(trend);
+      setState(() => _activeCat = 'All');
+    }
+  }
+
+  void _setExchangeType(String v) {
+    setState(() => _exchangeType = v);
+    _refetch();
+  }
+
+  void _refetch() {
+    final exType = (_exchangeType == 'all') ? null : _exchangeType;
+    context.read<PostService>().fetchPosts(
+      searchQuery: _query.isEmpty ? null : _query,
+      exchangeType: exType,
+    );
+  }
+
   List<PostModel> _filteredPosts(List<PostModel> raw) {
     List<PostModel> posts = List.of(raw);
 
     if (_skillType != 'all') {
-      const Map<String, Set<String>> _keywords = {
+      const kws = {
         'technical': {
           'coding',
           'programming',
-          'engineering',
           'data',
           'ai',
           'ml',
@@ -136,7 +217,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
         'soft': {
           'communication',
           'leadership',
-          'management',
           'teamwork',
           'speaking',
           'presentation',
@@ -150,7 +230,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
           'spanish',
           'german',
           'japanese',
-          'chinese',
           'translation',
         },
         'academic': {
@@ -179,17 +258,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
           'finance',
           'accounting',
           'sales',
-          'entrepreneurship',
           'startup',
           'excel',
         },
       };
-      final kws = _keywords[_skillType] ?? {};
-      if (kws.isNotEmpty) {
+      final k = kws[_skillType] ?? {};
+      if (k.isNotEmpty) {
         posts = posts.where((p) {
           final hay = '${p.skillOffered} ${p.title} ${p.tags.join(' ')}'
               .toLowerCase();
-          return kws.any((k) => hay.contains(k));
+          return k.any((kw) => hay.contains(kw));
         }).toList();
       }
     }
@@ -241,31 +319,26 @@ class _ExploreScreenState extends State<ExploreScreen> {
     switch (_sortBy) {
       case 'oldest':
         posts.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-        break;
       case 'rating_high':
         posts.sort(
           (a, b) => (b.profile?.averageRating ?? 0).compareTo(
             a.profile?.averageRating ?? 0,
           ),
         );
-        break;
       case 'rating_low':
         posts.sort(
           (a, b) => (a.profile?.averageRating ?? 0).compareTo(
             b.profile?.averageRating ?? 0,
           ),
         );
-        break;
-      default:
-        break;
     }
-
     return posts;
   }
 
+  // ── filter bottom sheet ───────────────────────────────────────────────────
   void _showFilterSheet() {
     String localSort = _sortBy;
-    String localExchange = _exchange;
+    String localExchange = _exchangeType;
     String localSkillType = _skillType;
     String localAvailability = _availability;
     String localSessionFormat = _sessionFormat;
@@ -279,7 +352,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           final sheetBg = _d ? const Color(0xFF111126) : Colors.white;
           final rowBg = _d ? const Color(0xFF191932) : const Color(0xFFF5F5FA);
           final divClr = _d ? const Color(0xFF252545) : const Color(0xFFEAEAF0);
-          const activeClr = _primaryPurple;
+          const activeClr = _purple;
 
           Widget radioRow({
             required String label,
@@ -288,72 +361,64 @@ class _ExploreScreenState extends State<ExploreScreen> {
             required VoidCallback onTap,
             bool isFirst = false,
             bool isLast = false,
-          }) {
-            final radius = BorderRadius.vertical(
-              top: Radius.circular(isFirst ? 14 : 0),
-              bottom: Radius.circular(isLast ? 14 : 0),
-            );
-            return GestureDetector(
-              onTap: () {
-                onTap();
-                setSt(() {});
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                decoration: BoxDecoration(
-                  color: active ? activeClr.withOpacity(0.12) : rowBg,
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: active
-                        ? activeClr.withOpacity(0.6)
-                        : Colors.transparent,
-                    width: active ? 1.5 : 0,
-                  ),
+          }) => GestureDetector(
+            onTap: () {
+              onTap();
+              setSt(() {});
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              decoration: BoxDecoration(
+                color: active ? activeClr.withOpacity(0.12) : rowBg,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(isFirst ? 14 : 0),
+                  bottom: Radius.circular(isLast ? 14 : 0),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 15,
-                ),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 17, color: active ? activeClr : _ts),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: GoogleFonts.dmSans(
-                          fontSize: 14,
-                          fontWeight: active
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: active ? activeClr : _tp,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: active ? activeClr : divClr,
-                          width: active ? 0 : 2,
-                        ),
-                        color: active ? activeClr : Colors.transparent,
-                      ),
-                      child: active
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                  ],
+                border: Border.all(
+                  color: active
+                      ? activeClr.withOpacity(0.6)
+                      : Colors.transparent,
+                  width: active ? 1.5 : 0,
                 ),
               ),
-            );
-          }
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              child: Row(
+                children: [
+                  Icon(icon, size: 17, color: active ? activeClr : _ts),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 14,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? activeClr : _tp,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: active ? activeClr : divClr,
+                        width: active ? 0 : 2,
+                      ),
+                      color: active ? activeClr : Colors.transparent,
+                    ),
+                    child: active
+                        ? const Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          );
 
           Widget segChip(String label, bool active, VoidCallback onTap) =>
               GestureDetector(
@@ -446,14 +511,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         onTap: () {
                           setState(() {
                             _sortBy = 'newest';
-                            _exchange = 'all';
+                            _exchangeType = 'all';
                             _skillType = 'all';
                             _availability = 'all';
                             _sessionFormat = 'all';
                           });
-                          context.read<PostService>().fetchPosts(
-                            searchQuery: _query.isEmpty ? null : _query,
-                          );
+                          _refetch();
                           setSt(() {});
                         },
                         child: Text(
@@ -468,7 +531,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   sectionLabel('Sort By'),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
@@ -507,26 +569,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  sectionLabel('Exchange Type'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final r in [
-                        ('all', 'All'),
-                        ('barter', 'Barter'),
-                        ('custom', 'Custom'),
-                      ])
-                        segChip(
-                          r.$2,
-                          localExchange == r.$1,
-                          () => localExchange = r.$1,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
                   sectionLabel('Skill Type'),
                   Wrap(
                     spacing: 8,
@@ -550,7 +592,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   sectionLabel('Availability'),
                   Wrap(
                     spacing: 8,
@@ -571,7 +612,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   sectionLabel('Session Format'),
                   Wrap(
                     spacing: 8,
@@ -592,27 +632,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-
                   GestureDetector(
                     onTap: () {
                       setState(() {
                         _sortBy = localSort;
-                        _exchange = localExchange;
+                        _exchangeType = localExchange;
                         _skillType = localSkillType;
                         _availability = localAvailability;
                         _sessionFormat = localSessionFormat;
                       });
-                      context.read<PostService>().fetchPosts(
-                        searchQuery: _query.isEmpty ? null : _query,
-                        exchangeType: _exchange == 'all' ? null : _exchange,
-                      );
+                      _refetch();
                       Navigator.pop(ctx);
                     },
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
-                        color: _primaryPurple,
+                        color: _purple,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -636,6 +672,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  // ── delete dialog ─────────────────────────────────────────────────────────
   Future<void> _delete(String postId) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -669,32 +706,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  // ── Reusable square icon button (like the notification button) ───────────
-  Widget _headerIconBtn({
-    required IconData icon,
-    required VoidCallback onTap,
-    Widget? badge,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: _d ? AppColors.darkSurfaceVariant : const Color(0xFFF2F2F4),
-          borderRadius: BorderRadius.circular(11),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(icon, size: 19, color: _tp),
-            if (badge != null) Positioned(top: 6, right: 6, child: badge),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // ── build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final myId = context.watch<AuthService>().currentUser?.id;
@@ -725,39 +737,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
             actions: [
-              // ── Requests button (square, like notification) ─────────────
-              _headerIconBtn(
-                icon: Icons.inbox_outlined,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const OpenRequestsScreen()),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // ── Leaderboard / Top button ────────────────────────────────
-              _headerIconBtn(
-                icon: Icons.leaderboard_outlined,
-                onTap: () {
-                  // TODO: navigate to leaderboard screen when available
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Leaderboard coming soon!',
-                        style: GoogleFonts.dmSans(),
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              // ── Notifications button ─────────────────────────────────────
-              _headerIconBtn(
+              _HeaderIconBtn(
                 icon: Icons.notifications_outlined,
+                dark: _d,
+                tp: _tp,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -775,7 +758,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-          // ── Search bar ────────────────────────────────────────────────────
+          // ── Search bar ───────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -797,10 +780,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             child: TextField(
                               controller: _searchCtrl,
                               onChanged: (q) {
-                                // If user types manually, deselect trending chip
-                                if (_activeTrendingSkill != null &&
-                                    q != _activeTrendingSkill) {
-                                  setState(() => _activeTrendingSkill = null);
+                                if (_activeCat != 'All' && q != _activeCat) {
+                                  setState(() => _activeCat = 'All');
                                 }
                                 _search(q);
                               },
@@ -809,7 +790,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 fontSize: 14,
                               ),
                               decoration: InputDecoration(
-                                hintText: 'Search skills, people...',
+                                hintText: 'Search skills, people, or topics...',
                                 hintStyle: GoogleFonts.dmSans(
                                   color: _ts,
                                   fontSize: 14,
@@ -828,7 +809,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               onTap: () {
                                 _searchCtrl.clear();
                                 _search('');
-                                setState(() => _activeTrendingSkill = null);
+                                setState(() {
+                                  _activeCat = 'All';
+                                  _activeTrend = 'All';
+                                });
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(11),
@@ -853,27 +837,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       width: 46,
                       height: 46,
                       decoration: BoxDecoration(
-                        color:
-                            (_exchange != 'all' ||
-                                _skillType != 'all' ||
-                                _sortBy != 'newest' ||
-                                _availability != 'all' ||
-                                _sessionFormat != 'all')
-                            ? AppColors.primary
-                            : _sv,
+                        color: _hasActiveFilters ? _purple : _sv,
                         borderRadius: BorderRadius.circular(13),
                       ),
                       child: Icon(
                         Icons.tune_rounded,
                         size: 20,
-                        color:
-                            (_exchange != 'all' ||
-                                _skillType != 'all' ||
-                                _sortBy != 'newest' ||
-                                _availability != 'all' ||
-                                _sessionFormat != 'all')
-                            ? Colors.white
-                            : _ts,
+                        color: _hasActiveFilters ? Colors.white : _ts,
                       ),
                     ),
                   ),
@@ -882,20 +852,122 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ).animate().fadeIn(delay: 40.ms),
           ),
 
-          // ── Trending Skills (with "All" chip) ─────────────────────────────
+          const SliverToBoxAdapter(child: SizedBox(height: 14)),
+
+          // ── Trending Skills row ──────────────────────────────────────────
           SliverToBoxAdapter(
-            child: _TrendingSkills(
-              d: _d,
-              tp: _tp,
-              ts: _ts,
-              activeSkill: _activeTrendingSkill,
-              onTap: _pickTrendingSkill,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    'Trending Skills',
+                    style: GoogleFonts.dmSans(
+                      color: _tp,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 36,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _trends.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 7),
+                    itemBuilder: (_, i) {
+                      final t = _trends[i];
+                      final active = _activeTrend == t.label;
+                      return _TrendChip(
+                        label: t.label,
+                        icon: t.icon,
+                        active: active,
+                        dark: _d,
+                        onTap: () => _setTrend(t.label),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 50.ms),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+          // ── Exchange type row ────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                physics: const BouncingScrollPhysics(),
+                itemCount: _exchangeTypes.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final et = _exchangeTypes[i];
+                  final active = _exchangeType == et.value;
+                  return _ExchangeChip(
+                    label: et.label,
+                    icon: et.icon,
+                    active: active,
+                    dark: _d,
+                    chipBg: _chipBg,
+                    chipBd: _chipBd,
+                    onTap: () => _setExchangeType(et.value),
+                  );
+                },
+              ),
             ).animate().fadeIn(delay: 80.ms),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-          // ── Posts list ────────────────────────────────────────────────────
+          // ── "N skills found" + List / Grid toggle ────────────────────────
+          Consumer<PostService>(
+            builder: (_, ps, __) {
+              final filtered = _filteredPosts(ps.posts);
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Row(
+                    children: [
+                      Text(
+                        '${filtered.length} skill${filtered.length == 1 ? '' : 's'} found',
+                        style: GoogleFonts.dmSans(
+                          color: _ts,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      _ViewToggleBtn(
+                        icon: Icons.view_list_rounded,
+                        label: 'List',
+                        active: !_isGridView,
+                        dark: _d,
+                        onTap: () => setState(() => _isGridView = false),
+                      ),
+                      const SizedBox(width: 8),
+                      _ViewToggleBtn(
+                        icon: Icons.grid_view_rounded,
+                        label: 'Grid',
+                        active: _isGridView,
+                        dark: _d,
+                        onTap: () => setState(() => _isGridView = true),
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn(delay: 100.ms),
+              );
+            },
+          ),
+
+          // ── Posts ────────────────────────────────────────────────────────
           Consumer<PostService>(
             builder: (_, ps, __) {
               if (ps.isLoading && ps.posts.isEmpty) {
@@ -910,16 +982,83 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 );
               }
 
-              if (ps.posts.isEmpty) {
-                return SliverFillRemaining(child: _empty());
-              }
-
               final filtered = _filteredPosts(ps.posts);
 
               if (filtered.isEmpty) {
                 return SliverFillRemaining(child: _empty());
               }
 
+              // ── GRID VIEW ──────────────────────────────────────────────
+              if (_isGridView) {
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 100),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 0.78,
+                        ),
+                    delegate: SliverChildBuilderDelegate((_, i) {
+                      final p = filtered[i];
+                      return _ExploreCard(
+                            key: ValueKey(p.id),
+                            post: p,
+                            gradient: _gradFor(p),
+                            isOwn: p.userId == myId,
+                            d: _d,
+                            tp: _tp,
+                            ts: _ts,
+                            tl: _tl,
+                            cardSurface: _d
+                                ? const Color(0xFF111126)
+                                : Colors.white,
+                            cardBorder: _ce,
+                            stripBg: _d
+                                ? const Color(0xFF0C0C1E)
+                                : const Color(0xFFF2F2FA),
+                            stripDivider: _d
+                                ? const Color(0xFF1C1C34)
+                                : const Color(0xFFDDDDEE),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PostDetailScreen(post: p),
+                                ),
+                              );
+                            },
+                            onAuthorTap: () {
+                              if (p.profile?.id != null)
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UserProfileScreen(
+                                      userId: p.profile!.id,
+                                    ),
+                                  ),
+                                );
+                            },
+                            onBookmark: () => ps.toggleBookmark(p.id),
+                            onEdit: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CreatePostScreen(post: p),
+                              ),
+                            ),
+                            onDelete: () => _delete(p.id),
+                          )
+                          .animate()
+                          .fadeIn(delay: Duration(milliseconds: i * 30))
+                          .slideY(begin: 0.05);
+                    }, childCount: filtered.length),
+                  ),
+                );
+              }
+
+              // ── LIST VIEW ──────────────────────────────────────────────
               return SliverPadding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 100),
                 sliver: SliverList(
@@ -976,6 +1115,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  bool get _hasActiveFilters =>
+      _skillType != 'all' ||
+      _sortBy != 'newest' ||
+      _availability != 'all' ||
+      _sessionFormat != 'all';
+
   Widget _empty() => Center(
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1012,87 +1157,66 @@ class _ExploreScreenState extends State<ExploreScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  _TrendingSkills  — horizontal scroll with "All" chip at front
+//  Trending skill chip  (horizontal scroll row below search bar)
+//  — exact style from screenshot: borderless inactive, muted icon, flat pill
 // ─────────────────────────────────────────────────────────────────────────────
-class _TrendingSkills extends StatelessWidget {
-  final bool d;
-  final Color tp, ts;
-  // null = "All" is active
-  final String? activeSkill;
-  final void Function(String? skill) onTap;
+class _TrendChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active, dark;
+  final VoidCallback onTap;
 
-  const _TrendingSkills({
-    required this.d,
-    required this.tp,
-    required this.ts,
-    required this.activeSkill,
+  const _TrendChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.dark,
     required this.onTap,
   });
 
-  static const _skills = [
-    (label: 'UI/UX Design', icon: Icons.design_services_rounded),
-    (label: 'Video Editing', icon: Icons.videocam_rounded),
-    (label: 'Photography', icon: Icons.camera_alt_outlined),
-    (label: 'Public Speaking', icon: Icons.mic_rounded),
-    (label: 'Excel', icon: Icons.table_chart_outlined),
-    (label: 'Python', icon: Icons.code_rounded),
-    (label: 'Music', icon: Icons.music_note_rounded),
-    (label: 'Writing', icon: Icons.edit_note_rounded),
-    (label: 'Figma', icon: Icons.palette_outlined),
-    (label: 'Data Analysis', icon: Icons.bar_chart_rounded),
-    (label: 'Marketing', icon: Icons.campaign_outlined),
-    (label: 'Finance', icon: Icons.attach_money_rounded),
-  ];
-
   static const _purple = Color(0xFF7C5CFC);
 
-  Widget _chip({
-    required bool d,
-    required Color tp,
-    required bool active,
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    final chipBg = active
-        ? _purple
-        : (d ? const Color(0xFF1A1A2E) : Colors.white);
-    final chipBd = active
-        ? _purple
-        : (d ? const Color(0xFF2A2A42) : const Color(0xFFE8E8F0));
-    final iconColor = active ? Colors.white : _purple;
-    final textColor = active ? Colors.white : tp;
+  @override
+  Widget build(BuildContext context) {
+    final inactiveBg = dark ? const Color(0xFF12112A) : const Color(0xFFEEEEF8);
+    final iconColor = active
+        ? Colors.white
+        : (dark ? const Color(0xFF6060A0) : const Color(0xFF8080B0));
+    final textColor = active
+        ? Colors.white
+        : (dark ? const Color(0xFFB0B0D8) : const Color(0xFF444466));
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: chipBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: chipBd, width: 1),
-          boxShadow: d
-              ? []
-              : [
+          color: active ? _purple : inactiveBg,
+          borderRadius: BorderRadius.circular(10),
+          border: active ? Border.all(color: _purple, width: 1) : null,
+          boxShadow: active
+              ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(active ? 0.12 : 0.06),
-                    blurRadius: 6,
+                    color: _purple.withOpacity(0.30),
+                    blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
-                ],
+                ]
+              : [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: iconColor),
-            const SizedBox(width: 7),
+            Icon(icon, size: 13, color: iconColor),
+            const SizedBox(width: 5),
             Text(
               label,
               style: GoogleFonts.dmSans(
                 color: textColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: -0.1,
               ),
             ),
           ],
@@ -1100,66 +1224,264 @@ class _TrendingSkills extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Category chip  (top row: All / Design / Coding …)
+//  — matches trending-skills pill: borderless inactive, muted icons, flat
+// ─────────────────────────────────────────────────────────────────────────────
+class _CatChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active, dark;
+  final Color chipBg, chipBd;
+  final VoidCallback onTap;
+
+  const _CatChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.dark,
+    required this.chipBg,
+    required this.chipBd,
+    required this.onTap,
+  });
+
+  static const _purple = Color(0xFF7C5CFC);
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-          child: Text(
-            'Trending Skills',
-            style: GoogleFonts.dmSans(
-              color: tp,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              // ── "All" chip first ─────────────────────────────────────
-              _chip(
-                d: d,
-                tp: tp,
-                active: activeSkill == null,
-                label: 'All',
-                icon: Icons.apps_rounded,
-                onTap: () => onTap(null),
-              ),
-              const SizedBox(width: 8),
-              // ── Skill chips ──────────────────────────────────────────
-              ..._skills.map(
-                (skill) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _chip(
-                    d: d,
-                    tp: tp,
-                    active: activeSkill == skill.label,
-                    label: skill.label,
-                    icon: skill.icon,
-                    onTap: () => onTap(skill.label),
+    // Inactive: deep navy bg, NO border, muted grey-blue icon + text
+    // Active: solid purple fill, white icon + text, subtle glow
+    final inactiveBg = dark ? const Color(0xFF12112A) : const Color(0xFFEEEEF8);
+    final iconColor = active
+        ? Colors.white
+        : (dark ? const Color(0xFF6060A0) : const Color(0xFF8080B0));
+    final textColor = active
+        ? Colors.white
+        : (dark ? const Color(0xFFB0B0D8) : const Color(0xFF444466));
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? _purple : inactiveBg,
+          borderRadius: BorderRadius.circular(10),
+          // No border on inactive — flat look matching the screenshot
+          border: active ? Border.all(color: _purple, width: 1) : null,
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: _purple.withOpacity(0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                ),
-              ),
-            ],
-          ),
+                ]
+              : [],
         ),
-        const SizedBox(height: 4),
-      ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: iconColor),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                color: textColor,
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  _ExploreCard  –  2-col grid card
+//  Exchange-type chip  (All Types / Barter / Open Req / Custom)
+//  — unified trending-skills pill style, consistent purple accent
+// ─────────────────────────────────────────────────────────────────────────────
+class _ExchangeChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active, dark;
+  final Color chipBg, chipBd;
+  final VoidCallback onTap;
+
+  const _ExchangeChip({
+    required this.label,
+    required this.icon,
+    required this.active,
+    required this.dark,
+    required this.chipBg,
+    required this.chipBd,
+    required this.onTap,
+  });
+
+  static const _purple = Color(0xFF7C5CFC);
+
+  @override
+  Widget build(BuildContext context) {
+    final inactiveBg = dark ? const Color(0xFF12112A) : const Color(0xFFEEEEF8);
+    final iconColor = active
+        ? Colors.white
+        : (dark ? const Color(0xFF6060A0) : const Color(0xFF8080B0));
+    final textColor = active
+        ? Colors.white
+        : (dark ? const Color(0xFFB0B0D8) : const Color(0xFF444466));
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? _purple : inactiveBg,
+          borderRadius: BorderRadius.circular(10),
+          border: active ? Border.all(color: _purple, width: 1) : null,
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: _purple.withOpacity(0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: iconColor),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                color: textColor,
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  List / Grid toggle button
+// ─────────────────────────────────────────────────────────────────────────────
+class _ViewToggleBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active, dark;
+  final VoidCallback onTap;
+
+  const _ViewToggleBtn({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.dark,
+    required this.onTap,
+  });
+
+  static const _purple = Color(0xFF7C5CFC);
+
+  @override
+  Widget build(BuildContext context) {
+    final inactiveBg = dark ? const Color(0xFF1A1A2E) : const Color(0xFFF0F0F8);
+    final inactiveBd = dark ? const Color(0xFF2A2A42) : const Color(0xFFDDDDEE);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? _purple : inactiveBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: active ? _purple : inactiveBd),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: _purple.withOpacity(0.28),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: active
+                  ? Colors.white
+                  : (dark ? const Color(0xFF9090B0) : const Color(0xFF555575)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                color: active
+                    ? Colors.white
+                    : (dark
+                          ? const Color(0xFF9090B0)
+                          : const Color(0xFF555575)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Header icon button
+// ─────────────────────────────────────────────────────────────────────────────
+class _HeaderIconBtn extends StatelessWidget {
+  final IconData icon;
+  final bool dark;
+  final Color tp;
+  final VoidCallback onTap;
+
+  const _HeaderIconBtn({
+    required this.icon,
+    required this.dark,
+    required this.tp,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: dark ? AppColors.darkSurfaceVariant : const Color(0xFFF2F2F4),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Icon(icon, size: 19, color: tp),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Grid card  (_ExploreCard)
 // ─────────────────────────────────────────────────────────────────────────────
 class _ExploreCard extends StatelessWidget {
   final PostModel post;
@@ -1227,6 +1549,7 @@ class _ExploreCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Gradient header
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
@@ -1321,29 +1644,6 @@ class _ExploreCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    if (isOwn)
-                      Positioned(
-                        left: 8,
-                        bottom: 7,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: gradient[1].withOpacity(0.22),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'My Swap',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w700,
-                              color: gradient[1],
-                            ),
-                          ),
-                        ),
-                      ),
                     Positioned(
                       right: 8,
                       bottom: 7,
@@ -1372,6 +1672,7 @@ class _ExploreCard extends StatelessWidget {
                 ),
               ),
             ),
+            // Author
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 8, 9, 0),
               child: GestureDetector(
@@ -1418,6 +1719,7 @@ class _ExploreCard extends StatelessWidget {
                 ),
               ),
             ),
+            // Title
             Padding(
               padding: const EdgeInsets.fromLTRB(9, 5, 9, 0),
               child: Text(
@@ -1433,6 +1735,7 @@ class _ExploreCard extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            // Offering / Wants strip
             Container(
               margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -1553,9 +1856,7 @@ class _MiniBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-
   const _MiniBtn({
-    super.key,
     required this.icon,
     required this.color,
     required this.onTap,
@@ -1576,87 +1877,6 @@ class _MiniBtn extends StatelessWidget {
           ],
         ),
         child: Icon(icon, size: 13, color: color),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  _ShimmerCard
-// ─────────────────────────────────────────────────────────────────────────────
-class _ShimmerCard extends StatelessWidget {
-  final bool d;
-  const _ShimmerCard({required this.d});
-
-  @override
-  Widget build(BuildContext context) {
-    final base = d ? const Color(0xFF111126) : const Color(0xFFEEEEEE);
-    final high = d ? const Color(0xFF1A1A2E) : const Color(0xFFF8F8F8);
-    return Container(
-      decoration: BoxDecoration(
-        color: base,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 60,
-            decoration: BoxDecoration(
-              color: high,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: high,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      width: 55,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: high,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: high,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Container(
-                  width: 70,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: high,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
