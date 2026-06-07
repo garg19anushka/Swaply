@@ -1,39 +1,37 @@
-// ============================================================
-//  swap_post_card.dart
+// lib/widgets/post_card.dart
 //
-//  Matches the screenshot exactly:
-//  • Avatar (initials) + name + handle + time + star rating + campus badge
-//  • Bold title, grey description
-//  • Coral/pink skill pills (offered)
-//  • "Wants:" line in muted label + coloured skill names
-//  • Online now pill + swap-count badge
-//  • Expiry warning line
-//  • Like / Comment / Bookmark icons at bottom left
-//  • Gradient "Swap →" pill button at bottom right
+// Card design matching the Swaply screenshot exactly:
+//   • Avatar (gradient initials) + Name + @handle · time · campus badge
+//   • Bold title + 2-line description
+//   • Dark OFFERS ⇅ WANTS double-pill box
+//   • Tag chips row (from skillOffered + tags)
+//   • 🔥 saves · ⇅ swaps  |  [Save]  [Swap →]
 //
-//  USAGE — replace PostCard in feed_screen.dart:
-//    import '../../widgets/swap_post_card.dart';
-//    SwapPostCard(
-//      post: p,
-//      onSwap: () => _openPostDetail(p),
-//      onBookmark: () => ps.toggleBookmark(p.id),
-//      onTapAuthor: () => _openUserProfile(p.userId),
-//    )
-// ============================================================
+// Usage:
+//   SwapPostCard(
+//     post: p,
+//     onSwap: () { ... },
+//     onBookmark: () { ... },
+//     onTapAuthor: () { ... },
+//   )
+// ──────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/post_model.dart';
 import '../utils/app_theme.dart';
 
+/// Alias so old call-sites (`PostCard(post: x)`) still compile.
+typedef PostCard = SwapPostCard;
+
+// ─────────────────────────────────────────────────────────────────────────────
 class SwapPostCard extends StatefulWidget {
   final PostModel post;
-  final VoidCallback onSwap;
-  final VoidCallback onBookmark;
-  final VoidCallback onTapAuthor;
-
-  /// If true the card is "own" – shows edit/delete instead of like
+  final VoidCallback? onSwap;
+  final VoidCallback? onBookmark;
+  final VoidCallback? onBookmarkToggle;
+  final VoidCallback? onTapAuthor;
   final bool isOwn;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
@@ -41,9 +39,10 @@ class SwapPostCard extends StatefulWidget {
   const SwapPostCard({
     super.key,
     required this.post,
-    required this.onSwap,
-    required this.onBookmark,
-    required this.onTapAuthor,
+    this.onSwap,
+    this.onBookmark,
+    this.onBookmarkToggle,
+    this.onTapAuthor,
     this.isOwn = false,
     this.onDelete,
     this.onEdit,
@@ -55,96 +54,88 @@ class SwapPostCard extends StatefulWidget {
 
 class _SwapPostCardState extends State<SwapPostCard>
     with SingleTickerProviderStateMixin {
-  bool _liked = false;
-  int _likeCount = 0;
-  late AnimationController _likeCtrl;
-  late Animation<double> _likeScale;
+  // ── local save (bookmark) state ───────────────────────────────────────────
+  late bool _saved;
+
+  VoidCallback? get _effectiveBookmark =>
+      widget.onBookmarkToggle ?? widget.onBookmark;
 
   @override
   void initState() {
     super.initState();
-    _likeCount = widget.post.bookmarksCount; // reuse bookmarks as like proxy
-    _likeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-      lowerBound: 0.75,
-      upperBound: 1.0,
-      value: 1.0,
-    );
-    _likeScale = CurvedAnimation(parent: _likeCtrl, curve: Curves.easeOut);
+    _saved = widget.post.isBookmarked;
   }
 
-  @override
-  void dispose() {
-    _likeCtrl.dispose();
-    super.dispose();
-  }
-
-  void _toggleLike() {
-    setState(() {
-      _liked = !_liked;
-      _likeCount += _liked ? 1 : -1;
-    });
-    _likeCtrl.reverse().then((_) => _likeCtrl.forward());
-  }
-
-  // ── Theme helpers ──────────────────────────────────────────
+  // ── theme helpers ─────────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
-  Color get _cardBg => _d ? const Color(0xFF141420) : Colors.white;
-  Color get _cardBorder => _d ? const Color(0xFF2A2A3E) : AppColors.border;
-  Color get _tp => _d ? AppColors.darkTextPrimary : AppColors.textPrimary;
-  Color get _ts => _d ? AppColors.darkTextSecondary : AppColors.textSecondary;
-  Color get _tl => _d ? AppColors.darkTextLight : AppColors.textLight;
 
-  // ── Days until expiry (mock: posts expire 7 days after creation) ──────────
-  int get _daysLeft {
-    final expiry = widget.post.createdAt.add(const Duration(days: 7));
-    return expiry.difference(DateTime.now()).inDays.clamp(0, 99);
-  }
+  // card
+  Color get _cardBg => _d ? const Color(0xFF111828) : Colors.white;
+  Color get _border => _d ? const Color(0xFF1E2A3A) : const Color(0xFFE5E8EE);
+  // text
+  Color get _tp => _d ? const Color(0xFFF1F5FB) : const Color(0xFF0D1117);
+  Color get _ts => _d ? const Color(0xFF8090A8) : const Color(0xFF5A677A);
+  Color get _tl => _d ? const Color(0xFF4A5A6E) : const Color(0xFFABB5C3);
+  // offer/wants box
+  Color get _boxBg => _d ? const Color(0xFF0D1520) : const Color(0xFF0D1520);
+  Color get _boxBorder =>
+      _d ? const Color(0xFF1E2E42) : const Color(0xFF1E2E42);
+  // tag chip
+  Color get _chipBg => _d ? const Color(0xFF1A2535) : const Color(0xFFEEF3FB);
+  Color get _chipBorder =>
+      _d ? const Color(0xFF253447) : const Color(0xFFD0DBE8);
+  Color get _chipText => _d ? const Color(0xFF7BA7D4) : const Color(0xFF3A6E9E);
 
-  bool get _isAvailable {
-    // Simple heuristic: available if created within 1 day
-    return DateTime.now().difference(widget.post.createdAt).inHours < 24;
-  }
-
-  // ── Initials from name ────────────────────────────────────
+  // ── helpers ───────────────────────────────────────────────────────────────
   String get _initials {
     final name =
         widget.post.profile?.fullName ?? widget.post.profile?.username ?? '?';
     final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
   }
 
-  // ── Time ago string ───────────────────────────────────────
+  String get _displayName =>
+      widget.post.profile?.fullName ?? widget.post.profile?.username ?? 'User';
+
+  String get _handle => '@${widget.post.profile?.username ?? 'user'}';
+
+  String get _campus => (widget.post.profile?.campus?.isNotEmpty == true)
+      ? widget.post.profile!.campus!
+      : 'MRU';
+
   String get _timeAgo {
-    final diff = DateTime.now().difference(widget.post.createdAt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+    final d = DateTime.now().difference(widget.post.createdAt);
+    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
+    if (d.inHours < 24) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
   }
 
-  // ── Avatar gradient per initials ──────────────────────────
   static const _avatarGrads = [
-    [Color(0xFF7C5CFC), Color(0xFFFF4D7D)], // purple-pink
-    [Color(0xFF00C9A7), Color(0xFF4CC9F0)], // teal-cyan
-    [Color(0xFFFFBE0B), Color(0xFFFF4D6D)], // amber-coral
-    [Color(0xFF6C47FF), Color(0xFF00C9A7)], // violet-mint
-    [Color(0xFFFF4D6D), Color(0xFFFF9F43)], // coral-orange
+    [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
+    [Color(0xFF00C9A7), Color(0xFF4CC9F0)],
+    [Color(0xFFFFBE0B), Color(0xFFFF6B35)],
+    [Color(0xFF6C47FF), Color(0xFF00C9A7)],
+    [Color(0xFFFF4D6D), Color(0xFFFF9F43)],
   ];
 
   List<Color> get _avatarGrad {
-    final idx = _initials.codeUnitAt(0) % _avatarGrads.length;
-    return _avatarGrads[idx];
+    if (_initials.isEmpty) return _avatarGrads[0];
+    return _avatarGrads[_initials.codeUnitAt(0) % _avatarGrads.length];
   }
 
+  // ── build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
-    final rating = post.profile?.averageRating ?? 0.0;
-    final campus = post.profile?.campus ?? 'MRU';
+
+    // Tags row: skillOffered first, then post.tags (deduped), max 4
+    final tagSet = <String>{post.skillOffered, ...post.tags};
+    final tags = tagSet.take(4).toList();
+
+    final savesCount = post.bookmarksCount;
+    // swaps displayed = (bookmarksCount * 0.6).round()  — keeps numbers realistic
+    final swapsCount = (post.bookmarksCount * 0.6).round();
 
     return GestureDetector(
       onTap: widget.onSwap,
@@ -152,99 +143,84 @@ class _SwapPostCardState extends State<SwapPostCard>
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
           color: _cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _cardBorder, width: 1),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _border, width: 1),
           boxShadow: _d
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 24,
                     offset: const Offset(0, 6),
                   ),
                 ]
-              : AppShadows.card,
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.07),
+                    blurRadius: 16,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── ROW 1: Avatar + Name + Handle + Time + Rating + Campus ──
-              _buildHeader(post, rating, campus),
+              // ── Header ─────────────────────────────────────────────────────
+              _buildHeader(post),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // ── ROW 2: Title ─────────────────────────────────────────────
+              // ── Title ──────────────────────────────────────────────────────
               Text(
                 post.title,
                 style: GoogleFonts.dmSans(
                   color: _tp,
-                  fontSize: 16,
+                  fontSize: 16.5,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                  height: 1.25,
+                  letterSpacing: -0.4,
+                  height: 1.22,
                 ),
               ),
 
               const SizedBox(height: 6),
 
-              // ── ROW 3: Description ────────────────────────────────────────
+              // ── Description ────────────────────────────────────────────────
               Text(
                 post.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.dmSans(
                   color: _ts,
-                  fontSize: 13,
+                  fontSize: 13.5,
                   height: 1.5,
                   fontWeight: FontWeight.w400,
                 ),
               ),
 
+              const SizedBox(height: 14),
+
+              // ── OFFERS ⇅ WANTS box ─────────────────────────────────────────
+              _buildOffersWantsBox(post),
+
               const SizedBox(height: 12),
 
-              // ── ROW 4: Skill pills (offered) ──────────────────────────────
-              _buildSkillPills(post),
+              // ── Tag chips ──────────────────────────────────────────────────
+              _buildTagChips(tags),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
 
-              // ── ROW 5: Wants line ─────────────────────────────────────────
-              if (post.skillWanted != null && post.skillWanted!.isNotEmpty)
-                _buildWantsLine(post.skillWanted!),
-
-              const SizedBox(height: 10),
-
-              // ── ROW 6: Online badge + swap count ──────────────────────────
-              _buildStatusRow(post),
-
-              const SizedBox(height: 8),
-
-              // ── ROW 7: Expiry ─────────────────────────────────────────────
-              if (_daysLeft <= 7) _buildExpiry(),
-
-              const SizedBox(height: 10),
-
-              // ── DIVIDER ───────────────────────────────────────────────────
-              Divider(
-                height: 1,
-                color: _d ? const Color(0xFF2A2A3E) : const Color(0xFFEEEEEE),
-              ),
-
-              const SizedBox(height: 10),
-
-              // ── ROW 8: Actions ────────────────────────────────────────────
-              _buildActions(),
+              // ── Bottom row: counts + buttons ───────────────────────────────
+              _buildBottomRow(savesCount, swapsCount),
             ],
           ),
         ),
-      ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.05, curve: Curves.easeOutCubic),
+      ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  Header
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildHeader(PostModel post, double rating, String campus) {
+  // ── Header ─────────────────────────────────────────────────────────────────
+  Widget _buildHeader(PostModel post) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -260,330 +236,296 @@ class _SwapPostCardState extends State<SwapPostCard>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(13),
             ),
             child: Center(
               child: Text(
                 _initials,
                 style: GoogleFonts.dmSans(
                   color: Colors.white,
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
           ),
         ),
-
         const SizedBox(width: 10),
 
-        // Name + handle + time + rating
+        // Name + handle + time
         Expanded(
           child: GestureDetector(
             onTap: widget.onTapAuthor,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Name row
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        post.profile?.fullName ??
-                            post.profile?.username ??
-                            'User',
-                        style: GoogleFonts.dmSans(
-                          color: _tp,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  _displayName,
+                  style: GoogleFonts.dmSans(
+                    color: _tp,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-
                 const SizedBox(height: 2),
-
-                // Handle · time · ⭐ rating
-                Row(
-                  children: [
-                    Text(
-                      '@${post.profile?.username ?? 'user'}',
-                      style: GoogleFonts.dmSans(
-                        color: _tl,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    _dot(),
-                    Text(
-                      _timeAgo,
-                      style: GoogleFonts.dmSans(color: _tl, fontSize: 11),
-                    ),
-                    if (rating > 0) ...[
-                      _dot(),
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 12,
-                        color: Color(0xFFFFBE0B),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        rating.toStringAsFixed(1),
-                        style: GoogleFonts.dmSans(
-                          color: _tl,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  '$_handle · $_campus',
+                  style: GoogleFonts.dmSans(
+                    color: _tl,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
         ),
 
-        // Campus badge (top-right, grey pill)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _d ? const Color(0xFF2A2A3E) : const Color(0xFFF0F0F5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _d ? const Color(0xFF3A3A55) : const Color(0xFFDDDDEE),
-            ),
-          ),
-          child: Text(
-            campus,
-            style: GoogleFonts.dmSans(
-              color: _ts,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+        const SizedBox(width: 8),
 
-  // ─────────────────────────────────────────────────────────────
-  //  Skill pills (coral / pink – "offering" colour)
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildSkillPills(PostModel post) {
-    // All tags + skillOffered as pills, coral style
-    final skills = <String>[post.skillOffered, ...post.tags].toSet().toList();
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: skills
-          .take(4)
-          .map((s) => _CoralPill(label: s, dark: _d))
-          .toList(),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  "Wants:" line
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildWantsLine(String skillWanted) {
-    // Split on common separators: comma, slash, &, "and"
-    final parts = skillWanted
-        .split(RegExp(r'[,/&]|\band\b', caseSensitive: false))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
-    return Row(
-      children: [
+        // Time badge
         Text(
-          'Wants: ',
+          _timeAgo,
           style: GoogleFonts.dmSans(
             color: _tl,
-            fontSize: 12.5,
+            fontSize: 11.5,
             fontWeight: FontWeight.w500,
           ),
         ),
-        Expanded(
-          child: Wrap(
-            spacing: 0,
-            children: parts.asMap().entries.map((e) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    e.value,
-                    style: GoogleFonts.dmSans(
-                      color: AppColors.primary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (e.key < parts.length - 1)
+      ],
+    );
+  }
+
+  // ── OFFERS ⇅ WANTS ──────────────────────────────────────────────────────────
+  Widget _buildOffersWantsBox(PostModel post) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _boxBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _boxBorder, width: 1),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            // OFFERS side
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 13,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      ' · ',
-                      style: GoogleFonts.dmSans(color: _tl, fontSize: 12.5),
+                      'OFFERS',
+                      style: GoogleFonts.dmSans(
+                        color: const Color(0xFF4A5A72),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                      ),
                     ),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  Status row: Online pill + swap count
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildStatusRow(PostModel post) {
-    final swapCount = post.bookmarksCount; // use bookmarks_count as proxy
-
-    return Row(
-      children: [
-        // Online / offline pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          decoration: BoxDecoration(
-            color: _isAvailable
-                ? const Color(0xFF00C9A7).withOpacity(0.12)
-                : const Color(0xFFFFBE0B).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: _isAvailable
-                  ? const Color(0xFF00C9A7).withOpacity(0.3)
-                  : const Color(0xFFFFBE0B).withOpacity(0.3),
+                    const SizedBox(height: 5),
+                    Text(
+                      post.skillOffered,
+                      style: GoogleFonts.dmSans(
+                        color: AppColors.primary, // purple
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
+
+            // Centre swap icon
+            Container(width: 1, color: _boxBorder),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Container(
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
-                  color: _isAvailable
-                      ? const Color(0xFF00C9A7)
-                      : const Color(0xFFFFBE0B),
-                  shape: BoxShape.circle,
+                  color: const Color(0xFF1A2535),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF253447)),
+                ),
+                child: const Icon(
+                  Icons.swap_vert_rounded,
+                  size: 16,
+                  color: Color(0xFF5A7A9A),
                 ),
               ),
-              const SizedBox(width: 5),
-              Text(
-                _isAvailable ? 'Online now' : 'Last seen recently',
-                style: GoogleFonts.dmSans(
-                  color: _isAvailable
-                      ? const Color(0xFF00C9A7)
-                      : const Color(0xFFFFBE0B),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Swap count (only show if > 0)
-        if (swapCount > 0) ...[
-          const SizedBox(width: 10),
-          Row(
-            children: [
-              const Text('✅', style: TextStyle(fontSize: 12)),
-              const SizedBox(width: 4),
-              Text(
-                '$swapCount swap${swapCount == 1 ? '' : 's'} via this post',
-                style: GoogleFonts.dmSans(
-                  color: const Color(0xFF00C9A7),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  Expiry warning
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildExpiry() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Row(
-        children: [
-          const Text('⏳', style: TextStyle(fontSize: 12)),
-          const SizedBox(width: 5),
-          Text(
-            _daysLeft == 0
-                ? 'Expires today!'
-                : 'Expires in $_daysLeft day${_daysLeft == 1 ? '' : 's'}',
-            style: GoogleFonts.dmSans(
-              color: const Color(0xFFFFBE0B),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
             ),
-          ),
-        ],
+            Container(width: 1, color: _boxBorder),
+
+            // WANTS side
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 13,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'WANTS',
+                      style: GoogleFonts.dmSans(
+                        color: const Color(0xFF4A5A72),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      post.skillWanted?.isNotEmpty == true
+                          ? post.skillWanted!
+                          : 'Open swap',
+                      style: GoogleFonts.dmSans(
+                        // coral/red — matches screenshot
+                        color: const Color(0xFFFF6B6B),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  //  Bottom actions: Like · Comment · Bookmark  |  Swap →
-  // ─────────────────────────────────────────────────────────────
-  Widget _buildActions() {
-    return Row(
-      children: [
-        // Like
-        _ActionBtn(
-          icon: _liked
-              ? Icons.favorite_rounded
-              : Icons.favorite_outline_rounded,
-          label: '$_likeCount',
-          color: _liked ? AppColors.secondary : _tl,
-          onTap: _toggleLike,
-          scale: _likeScale,
-        ),
-
-        const SizedBox(width: 4),
-
-        // Comment (decorative)
-        _ActionBtn(
-          icon: Icons.chat_bubble_outline_rounded,
-          label: '${(widget.post.bookmarksCount * 0.4).round()}',
-          color: _tl,
-          onTap: widget.onSwap,
-        ),
-
-        const SizedBox(width: 4),
-
-        // Bookmark
-        GestureDetector(
-          onTap: widget.onBookmark,
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Icon(
-              widget.post.isBookmarked
-                  ? Icons.bookmark_rounded
-                  : Icons.bookmark_outline_rounded,
-              size: 20,
-              color: widget.post.isBookmarked ? AppColors.primary : _tl,
+  // ── Tag chips ───────────────────────────────────────────────────────────────
+  Widget _buildTagChips(List<String> tags) {
+    return Wrap(
+      spacing: 7,
+      runSpacing: 7,
+      children: tags.map((t) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: _chipBg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: _chipBorder, width: 1),
+          ),
+          child: Text(
+            t,
+            style: GoogleFonts.dmSans(
+              color: _chipText,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ── Bottom row ──────────────────────────────────────────────────────────────
+  Widget _buildBottomRow(int savesCount, int swapsCount) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // 🔥 saves
+        const Text('🔥', style: TextStyle(fontSize: 13)),
+        const SizedBox(width: 4),
+        Text(
+          '$savesCount saves',
+          style: GoogleFonts.dmSans(
+            color: _tl,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 10),
+        // ⇅ swaps
+        const Text(
+          '⇅',
+          style: TextStyle(fontSize: 13, color: Color(0xFF5A7A9A)),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '$swapsCount swaps',
+          style: GoogleFonts.dmSans(
+            color: _tl,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
           ),
         ),
 
         const Spacer(),
 
-        // Swap → gradient pill
+        // [Save] outlined button
         GestureDetector(
-          onTap: widget.onSwap,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            setState(() => _saved = !_saved);
+            _effectiveBookmark?.call();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: _saved
+                  ? AppColors.primary.withOpacity(0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: _saved
+                    ? AppColors.primary.withOpacity(0.6)
+                    : (_d ? const Color(0xFF2A3A50) : const Color(0xFFCCD6E0)),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _saved
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_outline_rounded,
+                  size: 14,
+                  color: _saved ? AppColors.primary : _ts,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'Save',
+                  style: GoogleFonts.dmSans(
+                    color: _saved ? AppColors.primary : _ts,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // [Swap →] gradient button
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            widget.onSwap?.call();
+          },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
@@ -593,116 +535,69 @@ class _SwapPostCardState extends State<SwapPostCard>
               borderRadius: BorderRadius.circular(999),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF7C5CFC).withOpacity(0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
+                  color: const Color(0xFF7C5CFC).withOpacity(0.40),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Text(
-              'Swap →',
-              style: GoogleFonts.dmSans(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Swap',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  '→',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ],
     );
   }
-
-  // ─────────────────────────────────────────────────────────────
-  //  Helpers
-  // ─────────────────────────────────────────────────────────────
-  Widget _dot() => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 4),
-    child: Text('·', style: TextStyle(color: _tl, fontSize: 11)),
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Coral skill pill  (matches the pinkish pills in screenshot)
+//  Small edit / delete button (own posts only) — kept for compatibility
 // ─────────────────────────────────────────────────────────────────────────────
-class _CoralPill extends StatelessWidget {
-  final String label;
-  final bool dark;
-  const _CoralPill({required this.label, required this.dark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-      decoration: BoxDecoration(
-        // Matches the screenshot: coral/pink background
-        color: dark
-            ? const Color(0xFFFF4D6D).withOpacity(0.14)
-            : const Color(0xFFFF4D6D).withOpacity(0.09),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: const Color(0xFFFF4D6D).withOpacity(dark ? 0.35 : 0.25),
-        ),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.dmSans(
-          color: dark ? const Color(0xFFFF7A9A) : const Color(0xFFCC2244),
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Action button (like / comment) with optional scale animation
-// ─────────────────────────────────────────────────────────────────────────────
-class _ActionBtn extends StatelessWidget {
+class _SmallBtn extends StatelessWidget {
   final IconData icon;
-  final String label;
   final Color color;
   final VoidCallback onTap;
-  final Animation<double>? scale;
-
-  const _ActionBtn({
+  const _SmallBtn({
     required this.icon,
-    required this.label,
     required this.color,
     required this.onTap,
-    this.scale,
   });
 
   @override
   Widget build(BuildContext context) {
-    Widget child = GestureDetector(
+    return GestureDetector(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 19, color: color),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: GoogleFonts.dmSans(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.25)),
         ),
+        child: Icon(icon, size: 15, color: color),
       ),
     );
-
-    if (scale != null) {
-      child = ScaleTransition(scale: scale!, child: child);
-    }
-
-    return child;
   }
 }
