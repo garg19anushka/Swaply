@@ -40,33 +40,28 @@ class SwapPostCard extends StatefulWidget {
 class _SwapPostCardState extends State<SwapPostCard> {
   bool _swapping = false;
 
-  // ── Theme ─────────────────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
 
-  // Card always uses a rich dark surface to match screenshot
   Color get _cardBg => _d ? const Color(0xFF111828) : const Color(0xFF141828);
   Color get _cardBd => _d ? const Color(0xFF1E2A3A) : const Color(0xFF1E2A3A);
   Color get _tp => const Color(0xFFF1F5FB);
   Color get _ts => const Color(0xFF8090A8);
   Color get _tl => const Color(0xFF4A5A6E);
-
-  // OFFERS/WANTS box
   Color get _boxBg => const Color(0xFF0D1520);
   Color get _boxBd => const Color(0xFF1E2E42);
-
-  // Tag chips
   Color get _chipBg => const Color(0xFF1A2535);
   Color get _chipBd => const Color(0xFF253447);
   Color get _chipTxt => const Color(0xFF7BA7D4);
-
-  // Save btn
   Color get _saveBg => const Color(0xFF1A2535);
   Color get _saveBd => const Color(0xFF2A3A50);
 
-  static const _offClr = Color(0xFF7C5CFC); // purple  — OFFERS
-  static const _wantClr = Color(0xFFFF6B6B); // coral   — WANTS
+  static const _offClr = Color(0xFF7C5CFC);
+  static const _wantClr = Color(0xFFFF6B6B);
 
-  // ── Avatar gradient per initial ───────────────────────────────────────────
+  // ── Swap button colours — matches notifications bar purple ────────────────
+  static const _swapA = Color(0xFF6860E8);
+  static const _swapB = Color(0xFF5B52D0);
+
   static const _grads = [
     [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
     [Color(0xFF00C9A7), Color(0xFF4CC9F0)],
@@ -90,9 +85,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
 
   String get _displayName =>
       widget.post.profile?.fullName ?? widget.post.profile?.username ?? 'User';
-
   String get _handle => '@${widget.post.profile?.username ?? 'user'}';
-
   String get _campus => widget.post.profile?.campus?.isNotEmpty == true
       ? widget.post.profile!.campus!
       : '';
@@ -105,7 +98,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
     return '${d.inDays}d ago';
   }
 
-  // ── Swap → opens real chat ────────────────────────────────────────────────
   Future<void> _onSwapTap() async {
     if (widget.isOwn) {
       widget.onSwap?.call();
@@ -140,7 +132,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
     }
   }
 
-  // ── Save toggle → real Supabase bookmark ──────────────────────────────────
   Future<void> _onSaveTap() async {
     HapticFeedback.lightImpact();
     final cb = widget.onBookmarkToggle ?? widget.onBookmark;
@@ -164,17 +155,11 @@ class _SwapPostCardState extends State<SwapPostCard> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  //  Build
-  // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
-
-    // Tags: dedupe, max 4
     final tagSet = <String>{...post.tags};
     final tags = tagSet.take(4).toList();
-
     final saves = post.bookmarksCount;
 
     return GestureDetector(
@@ -218,12 +203,10 @@ class _SwapPostCardState extends State<SwapPostCard> {
     );
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Gradient avatar with initials
         GestureDetector(
           onTap: widget.onTapAuthor,
           child: Container(
@@ -250,8 +233,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
           ),
         ),
         const SizedBox(width: 10),
-
-        // Name + handle · campus
         Expanded(
           child: GestureDetector(
             onTap: widget.onTapAuthor,
@@ -284,8 +265,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
           ),
         ),
         const SizedBox(width: 8),
-
-        // Time ago
         Text(
           _timeAgo,
           style: GoogleFonts.dmSans(
@@ -298,7 +277,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
     );
   }
 
-  // ── Title ─────────────────────────────────────────────────────────────────
   Widget _buildTitle(PostModel post) => Text(
     post.title,
     style: GoogleFonts.dmSans(
@@ -310,7 +288,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
     ),
   );
 
-  // ── Description ───────────────────────────────────────────────────────────
   Widget _buildDescription(PostModel post) => Text(
     post.description,
     maxLines: 2,
@@ -323,7 +300,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
     ),
   );
 
-  // ── OFFERS ⇅ WANTS box ────────────────────────────────────────────────────
   Widget _buildOffersWants(PostModel post) {
     final isBarter = post.exchangeType == 'barter';
     final wantLabel = isBarter ? 'WANTS' : 'OFFERS';
@@ -342,7 +318,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
       child: IntrinsicHeight(
         child: Row(
           children: [
-            // OFFERS
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 13, 10, 13),
@@ -373,8 +348,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
                 ),
               ),
             ),
-
-            // Centre ⇅ icon
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Container(
@@ -392,8 +365,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
                 ),
               ),
             ),
-
-            // WANTS
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(10, 13, 14, 13),
@@ -430,7 +401,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
     );
   }
 
-  // ── Tag chips ─────────────────────────────────────────────────────────────
   Widget _buildTags(List<String> tags) => Wrap(
     spacing: 7,
     runSpacing: 7,
@@ -456,14 +426,12 @@ class _SwapPostCardState extends State<SwapPostCard> {
         .toList(),
   );
 
-  // ── Footer ────────────────────────────────────────────────────────────────
   Widget _buildFooter(PostModel post, int saves) {
     final saved = post.isBookmarked;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 🔥 saves
         const Text('🔥', style: TextStyle(fontSize: 12)),
         const SizedBox(width: 4),
         Text(
@@ -475,7 +443,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
           ),
         ),
         const SizedBox(width: 10),
-        // ⇅ swaps (placeholder — real swaps_count column not yet in DB)
         const Text(
           '⇅',
           style: TextStyle(fontSize: 13, color: Color(0xFF5A7A9A)),
@@ -489,10 +456,9 @@ class _SwapPostCardState extends State<SwapPostCard> {
             fontWeight: FontWeight.w600,
           ),
         ),
-
         const Spacer(),
 
-        // [□ Save] outlined pill
+        // Save button
         if (!widget.isOwn)
           GestureDetector(
             onTap: _onSaveTap,
@@ -535,7 +501,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
 
         if (!widget.isOwn) const SizedBox(width: 8),
 
-        // [Swap →] gradient pill
+        // Swap button — solid purple matching notifications bar
         if (!widget.isOwn)
           GestureDetector(
             onTap: _swapping ? null : _onSwapTap,
@@ -546,19 +512,17 @@ class _SwapPostCardState extends State<SwapPostCard> {
                 gradient: _swapping
                     ? null
                     : const LinearGradient(
-                        colors: [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
+                        colors: [_swapA, _swapB],
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
-                color: _swapping
-                    ? const Color(0xFF7C5CFC).withOpacity(0.5)
-                    : null,
+                color: _swapping ? _swapB.withOpacity(0.5) : null,
                 borderRadius: BorderRadius.circular(999),
                 boxShadow: _swapping
                     ? []
                     : [
                         BoxShadow(
-                          color: const Color(0xFF7C5CFC).withOpacity(0.40),
+                          color: _swapB.withOpacity(0.40),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -602,7 +566,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
             ),
           ),
 
-        // Own post: edit + delete instead
+        // Own post: edit + delete
         if (widget.isOwn) ...[
           _SmallBtn(
             icon: Icons.edit_outlined,
@@ -621,9 +585,6 @@ class _SwapPostCardState extends State<SwapPostCard> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Small edit / delete icon button (own posts)
-// ─────────────────────────────────────────────────────────────────────────────
 class _SmallBtn extends StatelessWidget {
   final IconData icon;
   final Color color;

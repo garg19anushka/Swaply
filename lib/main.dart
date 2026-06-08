@@ -12,6 +12,9 @@ import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 import 'services/leaderboard_service.dart';
 
+// ← Remove the home_screen import from main.dart entirely.
+// HomeScreen is navigated to FROM SplashScreen, not set here directly.
+
 const String supabaseUrl = 'https://yxmmuyfbanwqfsyqfyug.supabase.co';
 const String supabaseAnonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bW11eWZiYW53cWZzeXFmeXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3OTQ5MTUsImV4cCI6MjA5MTM3MDkxNX0.B6tCiP3wkgyPR0HTl17bDyNNjR-kNAY2aTrVh7zOiSY';
@@ -61,7 +64,8 @@ class Swaply extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: const SplashScreen(),
+            home:
+                const SplashScreen(), // ← Keep this. SplashScreen routes to HomeScreen after auth.
           );
         },
       ),

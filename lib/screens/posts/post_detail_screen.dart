@@ -13,9 +13,6 @@ import '../../widgets/avatar_widget.dart';
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  PostDetailScreen  –  "Skill Details"
-// ═══════════════════════════════════════════════════════════════════════════
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
   const PostDetailScreen({super.key, required this.post});
@@ -26,11 +23,10 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _starting = false;
+  bool _swapDone = false; // tracks "Swap Done" pressed state
 
-  // ── Theme tokens ──────────────────────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
 
-  // Card always renders on a near-black surface (matches screenshot dark style)
   Color get _bg => _d ? const Color(0xFF0E0D1C) : const Color(0xFF12111F);
   Color get _sf => _d ? const Color(0xFF161526) : const Color(0xFF1A1830);
   Color get _card => _d ? const Color(0xFF1A1930) : const Color(0xFF1E1C35);
@@ -43,10 +39,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   static const _offClr = Color(0xFF7C5CFC);
   static const _wantClr = Color(0xFFFF4D6D);
   static const _warning = Color(0xFFFFC107);
+  static const _green = Color(0xFF4CAF7D);
 
   PostModel get post => widget.post;
 
-  // ── CTA: Start Chat & Swap ────────────────────────────────────────────────
   Future<void> _startSwap() async {
     if (_starting) return;
     setState(() => _starting = true);
@@ -72,10 +68,40 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  // ── Bookmark toggle ───────────────────────────────────────────────────────
   Future<void> _toggleSave() async {
     HapticFeedback.lightImpact();
     await context.read<PostService>().toggleBookmark(post.id);
+  }
+
+  void _markSwapDone() {
+    HapticFeedback.mediumImpact();
+    setState(() => _swapDone = !_swapDone);
+    if (!_swapDone) return; // toggled off
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Swap marked as done!',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   void _snack(String msg) {
@@ -90,6 +116,153 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
+  // ── Bottom CTA bar ────────────────────────────────────────────────────────
+  Widget _bottomBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Row 1: Swap Done button (full width) ────────────────────
+            GestureDetector(
+              onTap: _markSwapDone,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: _swapDone
+                      ? _green.withOpacity(0.12)
+                      : const Color(0xFF13122A),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _swapDone
+                        ? _green.withOpacity(0.5)
+                        : const Color(0xFF2A2848),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _swapDone
+                          ? Icons.check_circle_rounded
+                          : Icons.check_circle_outline_rounded,
+                      color: _swapDone ? _green : const Color(0xFF7070A0),
+                      size: 17,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _swapDone ? 'Swap Done ✓' : 'Mark as Swap Done',
+                      style: GoogleFonts.dmSans(
+                        color: _swapDone ? _green : const Color(0xFF9090B8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // ── Row 2: Bookmark + Start Chat & Swap ─────────────────────
+            Row(
+              children: [
+                // Bookmark square button
+                GestureDetector(
+                  onTap: _toggleSave,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: post.isBookmarked
+                          ? _purple.withOpacity(0.15)
+                          : _card,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: post.isBookmarked
+                            ? _purple.withOpacity(0.6)
+                            : _bd,
+                        width: post.isBookmarked ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Icon(
+                      post.isBookmarked
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_outline_rounded,
+                      color: post.isBookmarked ? _purple : _ts,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Start Chat & Swap gradient button
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _starting ? null : _startSwap,
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5B52E8), Color(0xFF7C5CFC)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _purple.withOpacity(0.45),
+                            blurRadius: 16,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: _starting
+                          ? const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 9),
+                                Text(
+                                  'Start Chat & Swap',
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
@@ -98,8 +271,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     return Scaffold(
       backgroundColor: _bg,
-
-      // ── AppBar ──────────────────────────────────────────────────────────
       appBar: AppBar(
         backgroundColor: _sf,
         elevation: 0,
@@ -133,118 +304,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           preferredSize: const Size.fromHeight(1),
           child: Divider(height: 1, thickness: 1, color: _bd),
         ),
-        actions: [
-          // Bookmark icon top-right
-          GestureDetector(
-            onTap: _toggleSave,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: Icon(
-                post.isBookmarked
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_outline_rounded,
-                color: post.isBookmarked ? _purple : _ts,
-                size: 22,
-              ),
-            ),
-          ),
-        ],
+        actions: const [],
       ),
 
-      // ── CTA bottom bar ──────────────────────────────────────────────────
-      bottomNavigationBar: isOwn
-          ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Row(
-                  children: [
-                    // Bookmark button (left)
-                    GestureDetector(
-                      onTap: _toggleSave,
-                      child: Container(
-                        width: 50,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: _card,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: post.isBookmarked
-                                ? _purple.withOpacity(0.6)
-                                : _bd,
-                            width: 1,
-                          ),
-                        ),
-                        child: Icon(
-                          post.isBookmarked
-                              ? Icons.bookmark_rounded
-                              : Icons.bookmark_outline_rounded,
-                          color: post.isBookmarked ? _purple : _ts,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    // Start Chat & Swap (full-width gradient)
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: _starting ? null : _startSwap,
-                        child: Container(
-                          height: 52,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF5B52E8), Color(0xFF7C5CFC)],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _purple.withOpacity(0.45),
-                                blurRadius: 16,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: _starting
-                              ? const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.chat_bubble_outline_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 9),
-                                    Text(
-                                      'Start Chat & Swap',
-                                      style: GoogleFonts.dmSans(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      bottomNavigationBar: isOwn ? null : _bottomBar(),
 
-      // ── Body ─────────────────────────────────────────────────────────────
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Padding(
@@ -341,7 +405,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ).animate().fadeIn(delay: 80.ms),
               const SizedBox(height: 20),
 
-              // ── SKILL EXCHANGE card ───────────────────────────────────
+              // ── Skill Exchange card ───────────────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -353,7 +417,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header label
                     Text(
                       'SKILL EXCHANGE',
                       style: GoogleFonts.dmSans(
@@ -364,10 +427,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    // OFFERING ↔ OPEN TO
                     Row(
                       children: [
-                        // OFFERING side
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,7 +469,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             ],
                           ),
                         ),
-                        // Swap icon
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           child: Container(
@@ -426,7 +486,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             ),
                           ),
                         ),
-                        // OPEN TO side
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -497,7 +556,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ).animate().fadeIn(delay: 140.ms),
               const SizedBox(height: 20),
 
-              // ── Availability pills (derived from tags) ────────────────
+              // ── Availability pills ────────────────────────────────────
               if (_availabilityTags.isNotEmpty) ...[
                 Text(
                   'Availability',
@@ -572,7 +631,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ).animate().fadeIn(delay: 180.ms),
 
-              const SizedBox(height: 100),
+              const SizedBox(height: 120),
             ],
           ),
         ),
@@ -580,7 +639,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
-  // Derive availability from tags
   static const _availKeywords = {
     'Weekends',
     'Weekdays',
@@ -598,8 +656,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       post.tags.where((t) => _availKeywords.contains(t)).toList();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Pill  –  coloured badge (Open Request, etc.)
 // ─────────────────────────────────────────────────────────────────────────────
 class _Pill extends StatelessWidget {
   final String label;
@@ -635,9 +691,6 @@ class _Pill extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Tag pill
-// ─────────────────────────────────────────────────────────────────────────────
 class _TagPill extends StatelessWidget {
   final String tag;
   const _TagPill({required this.tag});
@@ -672,9 +725,6 @@ class _TagPill extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Availability pill  – emoji icon + label
-// ─────────────────────────────────────────────────────────────────────────────
 class _AvailabilityPill extends StatelessWidget {
   final String label;
   final Color card, bd, ts;
@@ -725,9 +775,6 @@ class _AvailabilityPill extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Stat box
-// ─────────────────────────────────────────────────────────────────────────────
 class _StatBox extends StatelessWidget {
   final String value, label;
   final IconData? icon;

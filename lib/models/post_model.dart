@@ -1,4 +1,41 @@
-import 'profile_model.dart';
+// lib/models/post_model.dart
+
+class ProfileModel {
+  final String id;
+  final String username;
+  final String? fullName;
+  final String? avatarUrl;
+  final String? campus;
+  final double averageRating;
+  final int totalSwaps;
+  final int ratingCount;
+
+  ProfileModel({
+    required this.id,
+    required this.username,
+    this.fullName,
+    this.avatarUrl,
+    this.campus,
+    this.averageRating = 0.0,
+    this.totalSwaps = 0,
+    this.ratingCount = 0,
+  });
+
+  factory ProfileModel.fromMap(Map<String, dynamic> map) {
+    return ProfileModel(
+      id: map['id'] ?? '',
+      username: map['username'] ?? '',
+      fullName: map['full_name'],
+      avatarUrl: map['avatar_url'],
+      campus: map['campus'],
+      averageRating: (map['average_rating'] ?? 0.0).toDouble(),
+      totalSwaps: map['total_swaps'] ?? 0,
+      ratingCount: map['rating_count'] ?? 0,
+    );
+  }
+
+  String get displayName => fullName ?? username;
+}
 
 class PostModel {
   final String id;
@@ -6,16 +43,16 @@ class PostModel {
   final String title;
   final String description;
   final String skillOffered;
-  final String? skillWanted;
-  final String exchangeType; // 'barter' or 'custom'
-  final String? customOffer;
+  final String? skillWanted; // nullable — not set for custom/open requests
   final List<String> tags;
-  final bool isOpenRequest;
-  final bool isActive;
   final int bookmarksCount;
+  final int swapCount;
+  final String exchangeType; // 'barter' | 'custom'
+  final String? customOffer;
+  final bool isOpenRequest;
+  final bool isBookmarked;
   final DateTime createdAt;
   final ProfileModel? profile;
-  bool isBookmarked;
 
   PostModel({
     required this.id,
@@ -24,50 +61,65 @@ class PostModel {
     required this.description,
     required this.skillOffered,
     this.skillWanted,
-    required this.exchangeType,
-    this.customOffer,
-    this.tags = const [],
-    this.isOpenRequest = false,
-    this.isActive = true,
+    required this.tags,
     this.bookmarksCount = 0,
+    this.swapCount = 0,
+    this.exchangeType = 'barter',
+    this.customOffer,
+    this.isOpenRequest = false,
+    this.isBookmarked = false,
     required this.createdAt,
     this.profile,
-    this.isBookmarked = false,
   });
 
-  factory PostModel.fromJson(Map<String, dynamic> json) {
+  factory PostModel.fromMap(
+    Map<String, dynamic> map, {
+    bool isBookmarked = false,
+  }) {
+    ProfileModel? profile;
+    if (map['profiles'] != null) {
+      profile = ProfileModel.fromMap(map['profiles'] as Map<String, dynamic>);
+    }
     return PostModel(
-      id: json['id'] ?? '',
-      userId: json['user_id'] ?? '',
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
-      skillOffered: json['skill_offered'] ?? '',
-      skillWanted: json['skill_wanted'],
-      exchangeType: json['exchange_type'] ?? 'barter',
-      customOffer: json['custom_offer'],
-      tags: List<String>.from(json['tags'] ?? []),
-      isOpenRequest: json['is_open_request'] ?? false,
-      isActive: json['is_active'] ?? true,
-      bookmarksCount: json['bookmarks_count'] ?? 0,
-      createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
-      profile: json['profiles'] != null
-          ? ProfileModel.fromJson(json['profiles'])
-          : null,
+      id: map['id'] ?? '',
+      userId: map['user_id'] ?? '',
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      skillOffered: map['skill_offered'] ?? '',
+      skillWanted: map['skill_wanted'], // stays nullable
+      tags: List<String>.from(map['tags'] ?? []),
+      bookmarksCount: map['bookmarks_count'] ?? map['save_count'] ?? 0,
+      swapCount: map['swap_count'] ?? 0,
+      exchangeType: map['exchange_type'] ?? 'barter',
+      customOffer: map['custom_offer'],
+      isOpenRequest: map['is_open_request'] ?? false,
+      isBookmarked: isBookmarked,
+      createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
+      profile: profile,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'user_id': userId,
-      'title': title,
-      'description': description,
-      'skill_offered': skillOffered,
-      'skill_wanted': skillWanted,
-      'exchange_type': exchangeType,
-      'custom_offer': customOffer,
-      'tags': tags,
-      'is_open_request': isOpenRequest,
-    };
+  PostModel copyWith({
+    bool? isBookmarked,
+    int? bookmarksCount,
+    ProfileModel? profile,
+  }) {
+    return PostModel(
+      id: id,
+      userId: userId,
+      title: title,
+      description: description,
+      skillOffered: skillOffered,
+      skillWanted: skillWanted,
+      tags: tags,
+      bookmarksCount: bookmarksCount ?? this.bookmarksCount,
+      swapCount: swapCount,
+      exchangeType: exchangeType,
+      customOffer: customOffer,
+      isOpenRequest: isOpenRequest,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      createdAt: createdAt,
+      profile: profile ?? this.profile,
+    );
   }
 }
