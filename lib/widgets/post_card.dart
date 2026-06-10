@@ -169,55 +169,120 @@ class _PostCardState extends State<PostCard>
     );
   }
 
+  // ── OFFERS / WANTS panel ─────────────────────────────────────────────────────
+
+  // Panel background tones — slightly distinct per side for visual separation
+  Color get _offersPanelBg => _dark
+      ? const Color(0xFF0E1128) // deep navy-blue tint
+      : const Color(0xFFECEEFA);
+  Color get _wantsPanelBg => _dark
+      ? const Color(0xFF120E16) // deep maroon-dark tint
+      : const Color(0xFFFAECEC);
+  Color get _offersPanelBdr =>
+      _dark ? const Color(0xFF252A4A) : const Color(0xFFCDD2EE);
+  Color get _wantsPanelBdr =>
+      _dark ? const Color(0xFF3A2030) : const Color(0xFFEECDCD);
+
   Widget _offersWantsPanel() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _panelBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _panelBdr),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: _panelSide('OFFERS', widget.post.skillOffered, _offersCol),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Icon(Icons.swap_vert, color: _metaCol, size: 18),
-            ),
-            Expanded(
-              child: _panelSide('WANTS', widget.post.skillWanted, _wantsCol),
-            ),
-          ],
+    final isCustom = widget.post.exchangeType == 'custom';
+    final rightLabel = isCustom ? 'OFFERS' : 'WANTS';
+    final rightValue = isCustom
+        ? (widget.post.customOffer ?? '—')
+        : (widget.post.skillWanted ?? '—');
+
+    return Row(
+      children: [
+        // ── Left box: OFFERS ───────────────────────────────────────────────
+        Expanded(
+          child: _skillBox(
+            label: 'OFFERS',
+            value: widget.post.skillOffered, // ← live from Supabase
+            valueColor: _offersCol,
+            bg: _offersPanelBg,
+            borderColor: _offersPanelBdr,
+          ),
         ),
-      ),
+
+        // ── Free-floating ↑↓ icon in the gap ──────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.arrow_upward_rounded,
+                color: _dark
+                    ? const Color(0xFF6870A8)
+                    : const Color(0xFF8890C0),
+                size: 13,
+              ),
+              const SizedBox(height: 1),
+              Icon(
+                Icons.arrow_downward_rounded,
+                color: _dark
+                    ? const Color(0xFF6870A8)
+                    : const Color(0xFF8890C0),
+                size: 13,
+              ),
+            ],
+          ),
+        ),
+
+        // ── Right box: WANTS ───────────────────────────────────────────────
+        Expanded(
+          child: _skillBox(
+            label: rightLabel,
+            value: rightValue, // ← live from Supabase
+            valueColor: _wantsCol,
+            bg: _wantsPanelBg,
+            borderColor: _wantsPanelBdr,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _panelSide(String label, String value, Color valueColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  Widget _skillBox({
+    required String label,
+    required String value,
+    required Color valueColor,
+    required Color bg,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1.2),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Label — small caps, muted
           Text(
             label,
             style: GoogleFonts.poppins(
-              color: _labelCol,
-              fontSize: 9.5,
+              color: _dark ? const Color(0xFF7880B0) : const Color(0xFF8890C0),
+              fontSize: 10,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
+              letterSpacing: 1.8,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
+          // Value — bound to live Supabase field
           Text(
             value,
             style: GoogleFonts.poppins(
               color: valueColor,
               fontWeight: FontWeight.w700,
-              fontSize: 13,
+              fontSize: 14,
+              height: 1.2,
             ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

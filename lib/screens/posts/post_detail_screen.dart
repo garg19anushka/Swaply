@@ -405,134 +405,125 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ).animate().fadeIn(delay: 80.ms),
               const SizedBox(height: 20),
 
-              // ── Skill Exchange card ───────────────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                decoration: BoxDecoration(
-                  color: _card,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _bd, width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SKILL EXCHANGE',
-                      style: GoogleFonts.dmSans(
-                        color: _tl,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
+              // ── Skill Exchange — two separate boxes ───────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _d
+                            ? const Color(0xFF0E1128)
+                            : const Color(0xFFECEEFA),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _d
+                              ? const Color(0xFF252A4A)
+                              : const Color(0xFFCDD2EE),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            'OFFERS',
+                            style: GoogleFonts.dmSans(
+                              color: const Color(0xFF7880B0),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.8,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            post.skillOffered,
+                            style: GoogleFonts.dmSans(
+                              color: _offClr,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'OFFERING',
-                                style: GoogleFonts.dmSans(
-                                  color: _tl,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _purple.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: _purple.withOpacity(0.35),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  post.skillOffered,
-                                  style: GoogleFonts.dmSans(
-                                    color: _offClr,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.arrow_upward_rounded,
+                          color: Color(0xFF6870A8),
+                          size: 13,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF252445),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: _bd, width: 1),
-                            ),
-                            child: Icon(
-                              Icons.swap_horiz_rounded,
-                              color: _ts,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                isBarter ? 'OPEN TO' : 'OFFERING',
-                                style: GoogleFonts.dmSans(
-                                  color: _tl,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _wantClr.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: _wantClr.withOpacity(0.35),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  isBarter
-                                      ? (post.skillWanted ?? 'Any Skill')
-                                      : (post.customOffer ?? 'Custom'),
-                                  style: GoogleFonts.dmSans(
-                                    color: _wantClr,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.end,
-                                ),
-                              ),
-                            ],
-                          ),
+                        SizedBox(height: 1),
+                        Icon(
+                          Icons.arrow_downward_rounded,
+                          color: Color(0xFF6870A8),
+                          size: 13,
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _d
+                            ? const Color(0xFF120E16)
+                            : const Color(0xFFFAECEC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _d
+                              ? const Color(0xFF3A2030)
+                              : const Color(0xFFEECDCD),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            isBarter ? 'WANTS' : 'OFFERS',
+                            style: GoogleFonts.dmSans(
+                              color: const Color(0xFF7880B0),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.8,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isBarter
+                                ? (post.skillWanted ?? 'Any Skill')
+                                : (post.customOffer ?? 'Custom'),
+                            style: GoogleFonts.dmSans(
+                              color: _wantClr,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ).animate().fadeIn(delay: 120.ms),
               const SizedBox(height: 20),
 
