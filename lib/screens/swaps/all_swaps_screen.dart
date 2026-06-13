@@ -1,5 +1,6 @@
 // lib/screens/swaps/all_swaps_screen.dart
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +18,7 @@ class AllSwapsScreen extends StatefulWidget {
 class _AllSwapsScreenState extends State<AllSwapsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
+  Timer? _countdownTimer;
 
   @override
   void initState() {
@@ -25,11 +27,17 @@ class _AllSwapsScreenState extends State<AllSwapsScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SwapService>().fetchAllSwaps();
     });
+
+    // Tick every minute to refresh expiry countdowns on pending cards
+    _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _tab.dispose();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
@@ -60,24 +68,50 @@ class _AllSwapsScreenState extends State<AllSwapsScreen>
             letterSpacing: -0.4,
           ),
         ),
-        bottom: TabBar(
-          controller: _tab,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: _ts,
-          indicatorColor: AppColors.primary,
-          indicatorWeight: 2.5,
-          labelStyle: GoogleFonts.dmSans(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Consumer<SwapService>(
+            builder: (_, ss, __) {
+              // Count items that need action for the badge
+              final needsAction = ss.allSwaps
+                  .where(
+                    (s) =>
+                        s.status == 'pending' || s.status == 'awaiting_review',
+                  )
+                  .length;
+
+              return TabBar(
+                controller: _tab,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: _ts,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 2.5,
+                labelStyle: GoogleFonts.dmSans(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+                unselectedLabelStyle: GoogleFonts.dmSans(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Active'),
+                        if (needsAction > 0) ...[
+                          const SizedBox(width: 6),
+                          _ActionBadge(count: needsAction),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Tab(text: 'Completed'),
+                ],
+              );
+            },
           ),
-          unselectedLabelStyle: GoogleFonts.dmSans(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-          tabs: const [
-            Tab(text: 'Active'),
-            Tab(text: 'Completed'),
-          ],
         ),
       ),
       body: Consumer<SwapService>(
@@ -91,11 +125,26 @@ class _AllSwapsScreenState extends State<AllSwapsScreen>
             );
           }
 
-          final active = ss.allSwaps
-              .where((s) => s.status == 'active')
-              .toList();
+          // Active tab: pending + active + awaiting_review, sorted by urgency
+          final active =
+              ss.allSwaps
+                  .where(
+                    (s) =>
+                        s.status != 'completed' &&
+                        s.status != 'cancelled' &&
+                        s.status != 'expired',
+                  )
+                  .toList()
+                ..sort((a, b) => a.sortPriority.compareTo(b.sortPriority));
+
+          // Completed tab: completed + cancelled + expired
           final completed = ss.allSwaps
-              .where((s) => s.status == 'completed')
+              .where(
+                (s) =>
+                    s.status == 'completed' ||
+                    s.status == 'cancelled' ||
+                    s.status == 'expired',
+              )
               .toList();
 
           return TabBarView(
@@ -114,6 +163,33 @@ class _AllSwapsScreenState extends State<AllSwapsScreen>
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Red dot badge for "needs action" count
+// ─────────────────────────────────────────────────────────────────────────────
+class _ActionBadge extends StatelessWidget {
+  final int count;
+  const _ActionBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.secondary,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$count',
+        style: GoogleFonts.dmSans(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -178,21 +254,33 @@ class _SwapTile extends StatelessWidget {
   const _SwapTile({required this.swap, required this.dark});
 
   Color get _cardBg => dark ? const Color(0xFF111126) : Colors.white;
-  Color get _border => dark ? const Color(0xFF252540) : AppColors.border;
+  Color get _border {
+    // Urgent swaps get a coloured border so they stand out
+    switch (swap.swapStatus) {
+      case SwapStatus.pending:
+        return AppColors.warning.withOpacity(0.6);
+      case SwapStatus.awaiting_review:
+        return AppColors.primaryLight.withOpacity(0.6);
+      default:
+        return dark ? const Color(0xFF252540) : AppColors.border;
+    }
+  }
+
   Color get _tp => dark ? const Color(0xFFF0F0FF) : AppColors.textPrimary;
   Color get _ts => dark ? const Color(0xFF9090B0) : AppColors.textSecondary;
 
   @override
   Widget build(BuildContext context) {
     final pct = (swap.progress * 100).round();
-    final isCompleted = swap.status == 'completed';
+    final status = swap.swapStatus;
+    final isCompleted = status == SwapStatus.completed;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
+        border: Border.all(color: _border, width: swap.needsAction ? 1.5 : 1),
         boxShadow: dark
             ? [
                 BoxShadow(
@@ -208,7 +296,7 @@ class _SwapTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title + badge
+            // ── Row 1: Title + status badge ───────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -222,41 +310,60 @@ class _SwapTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? AppColors.accentTeal.withOpacity(0.12)
-                        : AppColors.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isCompleted ? 'Completed ✓' : 'Active 🔄',
-                    style: GoogleFonts.dmSans(
-                      color: isCompleted
-                          ? AppColors.accentTeal
-                          : AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                _StatusBadge(status: status),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
 
-            // Partner
-            if (swap.partnerName != null || swap.partnerUsername != null)
-              Text(
-                'With ${swap.partnerName ?? '@${swap.partnerUsername}'}',
-                style: GoogleFonts.dmSans(color: _ts, fontSize: 12.5),
+            // ── Row 2: Partner + expiry countdown (if pending) ────────────
+            Row(
+              children: [
+                if (swap.partnerName != null || swap.partnerUsername != null)
+                  Expanded(
+                    child: Text(
+                      'With ${swap.partnerName ?? '@${swap.partnerUsername}'}',
+                      style: GoogleFonts.dmSans(color: _ts, fontSize: 12.5),
+                    ),
+                  ),
+                if (status == SwapStatus.pending &&
+                    swap.expiryCountdown != null)
+                  _ExpiryChip(countdown: swap.expiryCountdown!, dark: dark),
+              ],
+            ),
+
+            // ── Skill pills (if available) ────────────────────────────────
+            if (swap.offeredSkill != null || swap.wantedSkill != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (swap.offeredSkill != null)
+                    _SkillPill(
+                      label: swap.offeredSkill!,
+                      color: AppColors.accentTeal,
+                      dark: dark,
+                    ),
+                  if (swap.offeredSkill != null && swap.wantedSkill != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(
+                        Icons.swap_horiz_rounded,
+                        size: 14,
+                        color: _ts,
+                      ),
+                    ),
+                  if (swap.wantedSkill != null)
+                    _SkillPill(
+                      label: swap.wantedSkill!,
+                      color: AppColors.primary,
+                      dark: dark,
+                    ),
+                ],
               ),
+            ],
+
             const SizedBox(height: 12),
 
-            // Progress row
+            // ── Progress row ──────────────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -277,7 +384,7 @@ class _SwapTile extends StatelessWidget {
             ),
             const SizedBox(height: 7),
 
-            // Progress bar
+            // ── Progress bar ──────────────────────────────────────────────
             Container(
               height: 6,
               decoration: BoxDecoration(
@@ -301,15 +408,15 @@ class _SwapTile extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // Session dots
+            // ── Session dots ──────────────────────────────────────────────
             Row(
               children: List.generate(swap.totalSessions, (i) {
                 final done = i < swap.doneSessions;
-                final active = i == swap.doneSessions;
+                final activeDot = i == swap.doneSessions;
                 Color c;
                 if (done)
                   c = AppColors.accentTeal;
-                else if (active)
+                else if (activeDot)
                   c = AppColors.primary;
                 else
                   c = dark ? const Color(0xFF2A2A3E) : const Color(0xFFEEEEEE);
@@ -329,18 +436,211 @@ class _SwapTile extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // Next session
+            // ── Footer: next session + action button ──────────────────────
             Row(
               children: [
                 const Text('📅', style: TextStyle(fontSize: 12)),
                 const SizedBox(width: 6),
-                Text(
-                  swap.nextSessionLabel,
-                  style: GoogleFonts.dmSans(color: _ts, fontSize: 12),
+                Expanded(
+                  child: Text(
+                    swap.nextSessionLabel,
+                    style: GoogleFonts.dmSans(color: _ts, fontSize: 12),
+                  ),
                 ),
+                // Contextual CTA based on status
+                if (status == SwapStatus.awaiting_review)
+                  _ActionButton(
+                    label: '⭐  Rate Swap',
+                    color: AppColors.primary,
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      '/rate_swap',
+                      arguments: swap.id,
+                    ),
+                  ),
+                if (status == SwapStatus.pending)
+                  _ActionButton(
+                    label: '✓  Confirm',
+                    color: AppColors.accentTeal,
+                    onTap: () async {
+                      await context.read<SwapService>().confirmSwap(swap.id);
+                    },
+                  ),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Status badge pill
+// ─────────────────────────────────────────────────────────────────────────────
+class _StatusBadge extends StatelessWidget {
+  final SwapStatus status;
+  const _StatusBadge({required this.status});
+
+  Color get _bg {
+    switch (status) {
+      case SwapStatus.pending:
+        return AppColors.warning.withOpacity(0.14);
+      case SwapStatus.active:
+        return AppColors.primary.withOpacity(0.12);
+      case SwapStatus.awaiting_review:
+        return AppColors.primaryLight.withOpacity(0.14);
+      case SwapStatus.completed:
+        return AppColors.accentTeal.withOpacity(0.12);
+      case SwapStatus.cancelled:
+        return AppColors.error.withOpacity(0.10);
+      case SwapStatus.expired:
+        return Colors.grey.withOpacity(0.12);
+    }
+  }
+
+  Color get _fg {
+    switch (status) {
+      case SwapStatus.pending:
+        return const Color(0xFF997A00);
+      case SwapStatus.active:
+        return AppColors.primary;
+      case SwapStatus.awaiting_review:
+        return AppColors.primaryLight;
+      case SwapStatus.completed:
+        return AppColors.accentTeal;
+      case SwapStatus.cancelled:
+        return AppColors.error;
+      case SwapStatus.expired:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: _bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '${status.emoji}  ${status.label}',
+        style: GoogleFonts.dmSans(
+          color: _fg,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Expiry countdown chip (amber, shown on pending swaps)
+// ─────────────────────────────────────────────────────────────────────────────
+class _ExpiryChip extends StatelessWidget {
+  final String countdown;
+  final bool dark;
+  const _ExpiryChip({required this.countdown, required this.dark});
+
+  @override
+  Widget build(BuildContext context) {
+    final isExpiringSoon = countdown.contains('m') && !countdown.contains('h');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: (isExpiringSoon ? AppColors.error : AppColors.warning)
+            .withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.timer_outlined,
+            size: 11,
+            color: isExpiringSoon ? AppColors.error : AppColors.warning,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            countdown,
+            style: GoogleFonts.dmSans(
+              color: isExpiringSoon ? AppColors.error : AppColors.warning,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Skill pill (offered / wanted)
+// ─────────────────────────────────────────────────────────────────────────────
+class _SkillPill extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool dark;
+  const _SkillPill({
+    required this.label,
+    required this.color,
+    required this.dark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.dmSans(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Small contextual action button (Confirm / Rate)
+// ─────────────────────────────────────────────────────────────────────────────
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ActionButton({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.dmSans(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

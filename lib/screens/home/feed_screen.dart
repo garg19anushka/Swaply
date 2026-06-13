@@ -390,7 +390,7 @@ class _FeedScreenState extends State<FeedScreen> {
             ],
           ),
 
-          Positioned(bottom: 20, right: 20, child: const ChatbotFab()),
+          Positioned(bottom: 20, right: 20, child: ChatbotFab()),
         ],
       ),
     );
