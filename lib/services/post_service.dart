@@ -289,6 +289,56 @@ class PostService extends ChangeNotifier {
           'user_id': _uid!,
           'post_id': postId,
         });
+
+        // ── Notify the post owner about the new match ──────────────────
+        // Find the post to get the owner's id and skill info
+        PostModel? post;
+        for (final p in [..._posts, ..._openRequests, ..._bookmarkedPosts]) {
+          if (p.id == postId) {
+            post = p;
+            break;
+          }
+        }
+
+        // Only notify if the bookmarker is NOT the post owner
+        if (post != null && post.userId != _uid) {
+          // Fetch the bookmarker's profile to show their name + skills
+          final myProfile = await _supabase
+              .from('profiles')
+              .select('full_name, username, skills_offered')
+              .eq('id', _uid!)
+              .maybeSingle();
+
+          final myName =
+              myProfile?['full_name'] as String? ??
+              myProfile?['username'] as String? ??
+              'Someone';
+
+          final mySkill =
+              (myProfile?['skills_offered'] as List?)?.isNotEmpty == true
+              ? (myProfile!['skills_offered'] as List).first.toString()
+              : null;
+
+          await _supabase.from('notifications').insert({
+            'user_id': post.userId, // notify the POST OWNER
+            'type': 'new_match',
+            'title': '$myName bookmarked your post! 🔖',
+            'body': mySkill != null
+                ? '$myName offers $mySkill — looks like a great match for your ${post.skillOffered} post.'
+                : '$myName bookmarked your "${post.skillOffered}" post.',
+            'data': {
+              'post_id': postId,
+              'bookmarker_id': _uid,
+              'bookmarker_name': myName,
+              // skill_1 and skill_2 are used by the notification card
+              // to render the teal skill exchange pill
+              'skill_1': mySkill ?? 'Their skill',
+              'skill_2': post.skillOffered,
+              'route': '/explore',
+            },
+            'is_read': false,
+          });
+        }
       }
     } catch (e) {
       // Revert on error

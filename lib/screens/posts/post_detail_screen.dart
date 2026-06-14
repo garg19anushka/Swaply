@@ -87,16 +87,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     HapticFeedback.mediumImpact();
 
     try {
-      // What the REQUESTER is offering = what the POST says is wanted
-      // (they want to learn what the post owner is teaching).
-      // What the REQUESTER wants = what the POST is offering.
-      // If the post is an open request (skillWanted is null), use the
-      // post title as context rather than the generic 'Your skill'.
+      // offeredSkill = what the post says is wanted (the requester offers that)
+      // wantedSkill  = what the post is offering (the requester wants to learn that)
+      // If the post is an open request skillWanted may be null — pass null and
+      // let SwapService fill it in from the requester's profile skills_offered.
       final offeredSkill =
           (post.skillWanted != null && post.skillWanted!.isNotEmpty)
           ? post.skillWanted!
-          : (myProfile?['skills_offered'] as List?)?.firstOrNull?.toString() ??
-                post.title;
+          : null; // SwapService will resolve this from the requester's profile
       final wantedSkill = post.skillOffered;
 
       final swapId = await context.read<SwapService>().requestSwap(

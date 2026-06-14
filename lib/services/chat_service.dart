@@ -329,11 +329,14 @@ class ChatService extends ChangeNotifier {
     required String rateeId,
     required int rating,
     String? review,
+    String? raterName, // displayed in the notification title
+    String? skillRated, // the skill that was swapped (shown in notification)
   }) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return false;
 
     try {
+      // 1. Save the rating row
       await supabase.from('ratings').insert({
         'swap_id': swapId,
         'rater_id': userId,
@@ -341,8 +344,43 @@ class ChatService extends ChangeNotifier {
         'rating': rating,
         'review': review,
       });
+
+      // 2. Fetch the rater's name if not supplied
+      String displayName = raterName ?? 'Someone';
+      if (raterName == null) {
+        final profile = await supabase
+            .from('profiles')
+            .select('full_name, username')
+            .eq('id', userId)
+            .maybeSingle();
+        displayName =
+            profile?['full_name'] as String? ??
+            profile?['username'] as String? ??
+            'Someone';
+      }
+
+      // 3. Insert a real-time 'rating' notification for the ratee
+      await supabase.from('notifications').insert({
+        'user_id': rateeId,
+        'type': 'rating',
+        'title': '$displayName rated your session ⭐',
+        'body': skillRated != null
+            ? '$displayName gave you $rating star${rating == 1 ? '' : 's'} for $skillRated.'
+            : '$displayName gave you $rating star${rating == 1 ? '' : 's'}.',
+        'data': {
+          'swap_id': swapId,
+          'rater_id': userId,
+          'rater_name': displayName,
+          'rating': rating, // used by the notification card for stars
+          if (review != null && review.isNotEmpty) 'review': review,
+          if (skillRated != null) 'skill': skillRated,
+        },
+        'is_read': false,
+      });
+
       return true;
     } catch (e) {
+      debugPrint('ChatService.submitRating error: $e');
       return false;
     }
   }

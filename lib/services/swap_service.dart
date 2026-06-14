@@ -108,7 +108,7 @@ class SwapService extends ChangeNotifier {
   /// Returns the new swap's id on success, null on failure.
   Future<String?> requestSwap({
     required String responderId,
-    required String offeredSkill,
+    required String? offeredSkill, // nullable — resolved below if null
     required String wantedSkill,
     required String postId,
     int totalSessions = 4,
@@ -117,12 +117,22 @@ class SwapService extends ChangeNotifier {
     if (me == null) return null;
 
     try {
-      // 1. Fetch my profile snapshot so we can store requester identity
+      // 1. Fetch my profile snapshot
       final myProfile = await _client
           .from('profiles')
           .select('full_name, username, avatar_url, skills_offered')
           .eq('id', me.id)
           .maybeSingle();
+
+      // Resolve offeredSkill — if the post was an open request (skillWanted
+      // was null on the post), use the first skill from the requester's own
+      // profile, then fall back to a generic label.
+      final resolvedOfferedSkill =
+          (offeredSkill != null && offeredSkill.isNotEmpty)
+          ? offeredSkill
+          : ((myProfile?['skills_offered'] as List?)?.isNotEmpty == true
+                ? (myProfile!['skills_offered'] as List).first.toString()
+                : 'My skill');
 
       // 2. Fetch responder profile snapshot
       final theirProfile = await _client
@@ -167,9 +177,9 @@ class SwapService extends ChangeNotifier {
           .insert({
             'requester_id': me.id,
             'responder_id': responderId,
-            'offered_skill': offeredSkill,
+            'offered_skill': resolvedOfferedSkill,
             'wanted_skill': wantedSkill,
-            'swap_title': '$offeredSkill ↔ $wantedSkill',
+            'swap_title': '$resolvedOfferedSkill ↔ $wantedSkill',
             'status': 'pending',
             'total_sessions': totalSessions,
             'done_sessions': 0,
@@ -202,7 +212,7 @@ class SwapService extends ChangeNotifier {
         'type': 'swap_request',
         'title': 'New swap request! 🤝',
         'body':
-            '$myName wants to swap $offeredSkill for $wantedSkill with you.',
+            '$myName wants to swap $resolvedOfferedSkill for $wantedSkill with you.',
         'data': {
           'swap_id': swapId,
           'route': '/my_swaps',

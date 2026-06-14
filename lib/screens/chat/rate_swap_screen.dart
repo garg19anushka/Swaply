@@ -12,8 +12,14 @@ import '../../widgets/gradient_button.dart';
 class RateSwapScreen extends StatefulWidget {
   final String chatId;
   final ProfileModel? otherUser;
+  final String? skillName; // the skill that was swapped — shown in notification
 
-  const RateSwapScreen({super.key, required this.chatId, this.otherUser});
+  const RateSwapScreen({
+    super.key,
+    required this.chatId,
+    this.otherUser,
+    this.skillName,
+  });
 
   @override
   State<RateSwapScreen> createState() => _RateSwapScreenState();
@@ -68,6 +74,8 @@ class _RateSwapScreenState extends State<RateSwapScreen> {
       review: _reviewController.text.trim().isEmpty
           ? null
           : _reviewController.text.trim(),
+      // These two fields power the notification card content
+      skillRated: widget.skillName, // pass the swapped skill name
     );
 
     setState(() => _isSubmitting = false);

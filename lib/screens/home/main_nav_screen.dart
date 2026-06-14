@@ -28,7 +28,6 @@ class _MainNavScreenState extends State<MainNavScreen>
   @override
   void initState() {
     super.initState();
-    // Build screens here so FeedScreen can reference _onNavTap
     _screens = [
       FeedScreen(onSwitchTab: _onNavTap),
       const ExploreScreen(),
@@ -81,9 +80,6 @@ class _MainNavScreenState extends State<MainNavScreen>
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-//  Bottom Nav
-// ────────────────────────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
   final int currentIndex;
   final List<Animation<double>> iconScales;

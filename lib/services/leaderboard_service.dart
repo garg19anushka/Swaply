@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
 class LeaderboardEntry {
@@ -45,12 +46,17 @@ class LeaderboardService extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // Track the current user's last known rank so we can detect rank-ups
+  int? _lastKnownRank;
+
   List<LeaderboardEntry> get entries => _entries;
   List<LeaderboardEntry> get filteredEntries => _filteredEntries;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  /// Fetch overall leaderboard
+  final _supabase = Supabase.instance.client;
+
+  /// Fetch overall leaderboard and notify the current user if they ranked up
   Future<void> fetchLeaderboard() async {
     _isLoading = true;
     _error = null;
@@ -67,7 +73,6 @@ class LeaderboardService extends ChangeNotifier {
           .limit(50);
 
       _entries = (data as List).map((json) {
-        // Calculate score locally
         final swaps = (json['total_swaps'] ?? 0) as int;
         final rating = (json['average_rating'] ?? 0.0).toDouble();
         json['score'] = swaps * 10 + rating * 20;
@@ -77,6 +82,42 @@ class LeaderboardService extends ChangeNotifier {
       // Sort by score descending
       _entries.sort((a, b) => b.score.compareTo(a.score));
       _filteredEntries = List.from(_entries);
+
+      // ── Rank-up notification ─────────────────────────────────────────────
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId != null) {
+        // Find the current user's position (1-indexed)
+        final newRankIndex = _entries.indexWhere((e) => e.id == currentUserId);
+
+        if (newRankIndex != -1) {
+          final newRank = newRankIndex + 1;
+          final lastRank = _lastKnownRank;
+          final entry = _entries[newRankIndex];
+          final points = entry.score.toInt();
+
+          // Only notify if they moved UP and are in the top 100
+          if (lastRank != null && newRank < lastRank && newRank <= 100) {
+            final displayName = entry.fullName ?? entry.username;
+            await _supabase.from('notifications').insert({
+              'user_id': currentUserId,
+              'type': 'leaderboard',
+              'title': 'You climbed the leaderboard! 🚀',
+              'body': 'You moved from #$lastRank to #$newRank — keep swapping!',
+              'data': {
+                'rank': '#$newRank',
+                'points': '$points',
+                'previous_rank': lastRank,
+                'route': '/leaderboard',
+              },
+              'is_read': false,
+            });
+          }
+
+          // Save the new rank for next time
+          _lastKnownRank = newRank;
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────
     } catch (e) {
       _error = e.toString();
       debugPrint('Leaderboard error: $e');
