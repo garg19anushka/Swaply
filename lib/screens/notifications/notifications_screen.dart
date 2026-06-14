@@ -12,7 +12,9 @@ import 'package:provider/provider.dart';
 
 import '../../models/chat_model.dart';
 import '../../services/notification_service.dart';
+import '../../services/swap_service.dart';
 import '../../utils/app_theme.dart';
+import '../swaps/all_swaps_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Colour constants
@@ -77,15 +79,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _acceptedIds.add(n.id));
     _markOneRead(n);
-    // If the notification carries a swap_id, you could call SwapService here.
-    // final swapId = n.data['swap_id'] as String?;
-    _snack('Swap request accepted! 🎉');
+
+    // Persist the action to the DB by updating the notification type.
+    // _acceptedIds is in-memory only and resets on every rebuild/navigate.
+    // Storing 'swap_request_accepted' in the DB means the chip renders
+    // correctly after navigating away and coming back.
+    await context.read<NotificationService>().updateType(
+      n.id,
+      'swap_request_accepted',
+    );
+
+    final swapId = n.data['swap_id'] as String?;
+    if (swapId != null) {
+      await context.read<SwapService>().confirmSwap(swapId);
+    }
+
+    _snack('Swap confirmed! 🎉');
+
+    if (mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AllSwapsScreen()),
+      );
+    }
   }
 
   void _declineSwap(NotificationModel n) {
     HapticFeedback.lightImpact();
     setState(() => _declinedIds.add(n.id));
     _markOneRead(n);
+
+    // Same fix: persist so the "Declined" chip survives reload.
+    context.read<NotificationService>().updateType(
+      n.id,
+      'swap_request_declined',
+    );
+
+    final swapId = n.data['swap_id'] as String?;
+    if (swapId != null) {
+      context.read<SwapService>().declineSwap(swapId);
+    }
+
     _snack('Request declined');
   }
 
@@ -769,6 +803,14 @@ class _ActionRow extends StatelessWidget {
             _ghostBtn('Decline', onDecline),
           ],
         );
+
+      // These types are set in the DB after the user acts — so after a
+      // reload the correct chip shows instead of the Accept/Decline buttons.
+      case 'swap_request_accepted':
+        return _statusChip('✓ Accepted', _green);
+
+      case 'swap_request_declined':
+        return _statusChip('Declined', ts);
 
       // ── Post expiry: Renew ────────────────────────────────────────────────
       case 'post_expiry':

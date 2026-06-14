@@ -41,8 +41,12 @@ class AuthService extends ChangeNotifier {
         data: {'username': username.trim(), 'full_name': fullName.trim()},
       );
       if (response.user != null) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        await _upsertProfile(
+        // FIX: a fixed 500ms delay was a guess at how long it takes for
+        // the new session to be ready for RLS-checked writes. On a slow
+        // connection this isn't enough, the upsert fails silently inside
+        // _upsertProfile, and the user ends up with no profile row at all.
+        // Retry with backoff instead so we don't give up after one shot.
+        await _upsertProfileWithRetry(
           userId: response.user!.id,
           username: username.trim(),
           fullName: fullName.trim(),
@@ -70,15 +74,47 @@ class AuthService extends ChangeNotifier {
     required String username,
     required String fullName,
   }) async {
-    try {
-      await supabase.from('profiles').upsert({
-        'id': userId,
-        'username': username,
-        'full_name': fullName,
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'id');
-    } catch (e) {
-      debugPrint('Profile upsert error: $e');
+    await supabase.from('profiles').upsert({
+      'id': userId,
+      'username': username,
+      'full_name': fullName,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
+  }
+
+  /// FIX: retries the profile upsert a few times with backoff. Right after
+  /// signUp(), the client's session/JWT may not be fully ready yet, so an
+  /// RLS-checked insert can fail on the first attempt even though the user
+  /// was created successfully. Previously this was masked by a single fixed
+  /// 500ms delay and a silently-swallowed error — if it still failed, the
+  /// user simply had no row in `profiles`.
+  Future<void> _upsertProfileWithRetry({
+    required String userId,
+    required String username,
+    required String fullName,
+    int maxAttempts = 3,
+  }) async {
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await _upsertProfile(
+          userId: userId,
+          username: username,
+          fullName: fullName,
+        );
+        return; // success
+      } catch (e) {
+        debugPrint('Profile upsert attempt $attempt failed: $e');
+        if (attempt == maxAttempts) {
+          // Surface this so the UI can let the user know their profile
+          // may need to be completed manually, instead of failing silently.
+          _setError(
+            'Account created, but your profile could not be set up yet. '
+            'You may need to edit your profile after signing in.',
+          );
+        } else {
+          await Future.delayed(Duration(milliseconds: 400 * attempt));
+        }
+      }
     }
   }
 
@@ -266,10 +302,24 @@ class AuthService extends ChangeNotifier {
               .update(updates)
               .eq('id', currentUser!.id);
         } catch (e) {
-          // If 'links' column doesn't exist yet, retry without it
-          if (e.toString().contains('links') ||
-              e.toString().contains('column')) {
-            debugPrint('links column missing, retrying without it: $e');
+          // FIX: the old check matched ANY error whose message contained
+          // the word "column" — that's far too broad and would silently
+          // swallow unrelated update errors (wrong types, RLS issues,
+          // etc.) by retrying without 'links', hiding the real problem.
+          // Postgres reports an undefined column with error code 42703;
+          // only retry-without-links when that's specifically the cause
+          // AND 'links' was part of this update.
+          final isUndefinedLinksColumn =
+              updates.containsKey('links') &&
+              ((e is PostgrestException &&
+                      (e.code == '42703' || e.message.contains('links'))) ||
+                  e.toString().contains("'links'"));
+
+          if (isUndefinedLinksColumn) {
+            debugPrint(
+              'links column missing on profiles table, retrying without '
+              'it (run the updated supabase_setup.sql to add it): $e',
+            );
             final fallback = Map<String, dynamic>.from(updates)
               ..remove('links');
             await supabase

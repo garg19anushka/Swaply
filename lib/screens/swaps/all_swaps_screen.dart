@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../models/swap_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/swap_service.dart';
 import '../../utils/app_theme.dart';
 
@@ -154,11 +155,13 @@ class _AllSwapsScreenState extends State<AllSwapsScreen>
                 swaps: active,
                 dark: _d,
                 emptyMsg: 'No active swaps yet.',
+                viewerId: context.read<AuthService>().currentUser?.id,
               ),
               _SwapList(
                 swaps: completed,
                 dark: _d,
                 emptyMsg: 'No completed swaps yet.',
+                viewerId: context.read<AuthService>().currentUser?.id,
               ),
             ],
           );
@@ -202,11 +205,13 @@ class _SwapList extends StatelessWidget {
   final List<SwapModel> swaps;
   final bool dark;
   final String emptyMsg;
+  final String? viewerId;
 
   const _SwapList({
     required this.swaps,
     required this.dark,
     required this.emptyMsg,
+    this.viewerId,
   });
 
   @override
@@ -239,7 +244,8 @@ class _SwapList extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: swaps.length,
-      itemBuilder: (_, i) => _SwapTile(swap: swaps[i], dark: dark),
+      itemBuilder: (_, i) =>
+          _SwapTile(swap: swaps[i], dark: dark, viewerId: viewerId),
     );
   }
 }
@@ -250,8 +256,9 @@ class _SwapList extends StatelessWidget {
 class _SwapTile extends StatelessWidget {
   final SwapModel swap;
   final bool dark;
+  final String? viewerId;
 
-  const _SwapTile({required this.swap, required this.dark});
+  const _SwapTile({required this.swap, required this.dark, this.viewerId});
 
   Color get _cardBg => dark ? const Color(0xFF111126) : Colors.white;
   Color get _border {
@@ -318,10 +325,11 @@ class _SwapTile extends StatelessWidget {
             // ── Row 2: Partner + expiry countdown (if pending) ────────────
             Row(
               children: [
-                if (swap.partnerName != null || swap.partnerUsername != null)
+                if (swap.viewerPartnerName(viewerId) != null ||
+                    swap.viewerPartnerUsername(viewerId) != null)
                   Expanded(
                     child: Text(
-                      'With ${swap.partnerName ?? '@${swap.partnerUsername}'}',
+                      'With ${swap.viewerPartnerName(viewerId) ?? '@${swap.viewerPartnerUsername(viewerId)}'}',
                       style: GoogleFonts.dmSans(color: _ts, fontSize: 12.5),
                     ),
                   ),
@@ -458,14 +466,92 @@ class _SwapTile extends StatelessWidget {
                       arguments: swap.id,
                     ),
                   ),
-                if (status == SwapStatus.pending)
-                  _ActionButton(
-                    label: '✓  Confirm',
-                    color: AppColors.accentTeal,
-                    onTap: () async {
-                      await context.read<SwapService>().confirmSwap(swap.id);
-                    },
-                  ),
+                if (status == SwapStatus.pending) ...[
+                  // Only the responder sees Confirm/Decline.
+                  // If requesterId/responderId are null (old row), fall
+                  // back to "Awaiting reply" so no one sees stray buttons.
+                  if (viewerId != null &&
+                      swap.responderId != null &&
+                      viewerId == swap.responderId) ...[
+                    _ActionButton(
+                      label: '✗  Decline',
+                      color: AppColors.error,
+                      onTap: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            backgroundColor: dark
+                                ? const Color(0xFF1A1930)
+                                : Colors.white,
+                            title: Text(
+                              'Decline swap?',
+                              style: GoogleFonts.dmSans(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            content: Text(
+                              'The requester will be notified.',
+                              style: GoogleFonts.dmSans(),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: Text(
+                                  'Cancel',
+                                  style: GoogleFonts.dmSans(),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: Text(
+                                  'Decline',
+                                  style: GoogleFonts.dmSans(
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true && context.mounted) {
+                          await context.read<SwapService>().declineSwap(
+                            swap.id,
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _ActionButton(
+                      label: '✓  Confirm',
+                      color: AppColors.accentTeal,
+                      onTap: () async {
+                        await context.read<SwapService>().confirmSwap(swap.id);
+                      },
+                    ),
+                  ] else
+                    // Requester OR unidentified role → show awaiting chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.warning.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Text(
+                        '⏳ Awaiting reply',
+                        style: GoogleFonts.dmSans(
+                          color: AppColors.warning,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ],

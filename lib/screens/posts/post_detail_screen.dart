@@ -8,10 +8,12 @@ import '../../models/post_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/post_service.dart';
+import '../../services/swap_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
+import '../swaps/all_swaps_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
@@ -23,7 +25,8 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _starting = false;
-  bool _swapDone = false; // tracks "Swap Done" pressed state
+  bool _requesting = false; // tracks "Request Swap" loading state
+  bool _swapDone = false;
 
   bool get _d => Theme.of(context).brightness == Brightness.dark;
 
@@ -65,6 +68,97 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (mounted) _snack('Error: $e');
     } finally {
       if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  /// Sends a formal swap request via SwapService (System B).
+  /// Both parties must confirm before the swap becomes active.
+  Future<void> _requestSwap() async {
+    if (_requesting) return;
+
+    // Don't let a user request a swap with themselves
+    final myId = context.read<AuthService>().currentUser?.id;
+    if (myId == post.userId) {
+      _snack('You can\'t swap with yourself!');
+      return;
+    }
+
+    setState(() => _requesting = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      // What the REQUESTER is offering = what the POST says is wanted
+      // (they want to learn what the post owner is teaching).
+      // What the REQUESTER wants = what the POST is offering.
+      // If the post is an open request (skillWanted is null), use the
+      // post title as context rather than the generic 'Your skill'.
+      final offeredSkill =
+          (post.skillWanted != null && post.skillWanted!.isNotEmpty)
+          ? post.skillWanted!
+          : (myProfile?['skills_offered'] as List?)?.firstOrNull?.toString() ??
+                post.title;
+      final wantedSkill = post.skillOffered;
+
+      final swapId = await context.read<SwapService>().requestSwap(
+        responderId: post.userId,
+        offeredSkill: offeredSkill,
+        wantedSkill: wantedSkill,
+        postId: post.id,
+      );
+
+      if (!mounted) return;
+
+      if (swapId != null) {
+        // Success — show confirmation and offer to go to My Swaps
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Swap request sent! They\'ll be notified.',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: _green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'View',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AllSwapsScreen()),
+                );
+              },
+            ),
+          ),
+        );
+      } else {
+        // SwapService sets _error when it returns null
+        final err = context.read<SwapService>().error;
+        _snack(err ?? 'Could not send swap request. Please try again.');
+      }
+    } catch (e) {
+      if (mounted) _snack('Error: $e');
+    } finally {
+      if (mounted) setState(() => _requesting = false);
     }
   }
 
@@ -201,58 +295,107 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Start Chat & Swap gradient button
+                // ── Request Swap + Start Chat buttons ───────────────
                 Expanded(
-                  child: GestureDetector(
-                    onTap: _starting ? null : _startSwap,
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF5B52E8), Color(0xFF7C5CFC)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _purple.withOpacity(0.45),
-                            blurRadius: 16,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: _starting
-                          ? const Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 9),
-                                Text(
-                                  'Start Chat & Swap',
-                                  style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // PRIMARY: Request Swap (System B — both must confirm)
+                      GestureDetector(
+                        onTap: _requesting ? null : _requestSwap,
+                        child: Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF5B52E8), Color(0xFF7C5CFC)],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
-                    ),
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _purple.withOpacity(0.45),
+                                blurRadius: 16,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: _requesting
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.swap_horiz_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Text(
+                                      'Request Swap',
+                                      style: GoogleFonts.dmSans(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // SECONDARY: Start Chat (System A — kept as before)
+                      GestureDetector(
+                        onTap: _starting ? null : _startSwap,
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _card,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: _bd),
+                          ),
+                          child: _starting
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF7C5CFC),
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      color: Color(0xFF9090B8),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Start Chat',
+                                      style: GoogleFonts.dmSans(
+                                        color: const Color(0xFF9090B8),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

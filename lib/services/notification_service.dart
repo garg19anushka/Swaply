@@ -94,6 +94,40 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
+  // ── Update a notification's type (persists accept/decline across reloads) ─
+  /// Changes the notification type in the DB so that after navigating away
+  /// and back, the Accept/Decline buttons are replaced by the correct status
+  /// chip ('swap_request_accepted' or 'swap_request_declined') instead of
+  /// showing the buttons again.
+  Future<void> updateType(String notificationId, String newType) async {
+    // Optimistic local update
+    final idx = _notifications.indexWhere((n) => n.id == notificationId);
+    if (idx != -1) {
+      _notifications[idx] = NotificationModel(
+        id: _notifications[idx].id,
+        userId: _notifications[idx].userId,
+        type: newType,
+        title: _notifications[idx].title,
+        body: _notifications[idx].body,
+        data: _notifications[idx].data,
+        isRead: true,
+        createdAt: _notifications[idx].createdAt,
+      );
+      notifyListeners();
+    }
+
+    try {
+      await supabase
+          .from('notifications')
+          .update({'type': newType, 'is_read': true})
+          .eq('id', notificationId);
+    } catch (e) {
+      debugPrint('NotificationService.updateType error: $e');
+      // Re-fetch to restore correct state on failure
+      await fetchNotifications();
+    }
+  }
+
   // ── Mark all notifications as read ────────────────────────────────────────
   Future<void> markAllRead() async {
     final userId = supabase.auth.currentUser?.id;

@@ -8,17 +8,28 @@ class SwapModel {
   final int totalSessions;
   final int doneSessions;
   final String nextSessionLabel;
+
+  // Legacy single-side partner fields (kept for backwards compat)
   final String? partnerName;
   final String? partnerUsername;
   final String? partnerAvatarUrl;
-  final String
-  status; // 'pending' | 'active' | 'awaiting_review' | 'completed' | 'cancelled' | 'expired'
-  final DateTime? expiresAt; // NEW — deadline for pending requests
-  final DateTime? confirmedAt; // NEW — when swap was confirmed
-  final String? requesterId; // NEW — who initiated the swap
-  final String? responderId; // NEW — who received the request
-  final String? offeredSkill; // NEW — skill offered by requester
-  final String? wantedSkill; // NEW — skill wanted in return
+
+  final String status;
+  final DateTime? expiresAt;
+  final DateTime? confirmedAt;
+  final String? requesterId;
+  final String? responderId;
+  final String? offeredSkill;
+  final String? wantedSkill;
+
+  // Per-role identity snapshots — stored in DB so both parties see
+  // the correct "partner" regardless of which side they are on.
+  final String? requesterName;
+  final String? requesterUsername;
+  final String? requesterAvatarUrl;
+  final String? responderName;
+  final String? responderUsername;
+  final String? responderAvatarUrl;
 
   const SwapModel({
     required this.id,
@@ -38,15 +49,46 @@ class SwapModel {
     this.responderId,
     this.offeredSkill,
     this.wantedSkill,
+    this.requesterName,
+    this.requesterUsername,
+    this.requesterAvatarUrl,
+    this.responderName,
+    this.responderUsername,
+    this.responderAvatarUrl,
   });
 
-  /// Parsed SwapStatus enum for easy UI logic
-  SwapStatus get swapStatus => SwapStatus.fromString(status);
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// True when this swap needs an action from the current user
+  SwapStatus get swapStatus => SwapStatus.fromString(status);
   bool get needsAction => status == 'pending' || status == 'awaiting_review';
 
-  /// Remaining time string for pending swaps (e.g. "23h 14m")
+  /// Returns the display name of the *other* party given the current
+  /// viewer's userId. Falls back to the legacy partnerName field so
+  /// older rows (created before the per-role columns were added) still work.
+  String? viewerPartnerName(String? viewerUserId) {
+    if (viewerUserId == null) return partnerName;
+    if (viewerUserId == requesterId) {
+      return responderName ?? responderUsername ?? partnerName;
+    }
+    return requesterName ?? requesterUsername ?? partnerName;
+  }
+
+  String? viewerPartnerUsername(String? viewerUserId) {
+    if (viewerUserId == null) return partnerUsername;
+    if (viewerUserId == requesterId) {
+      return responderUsername ?? partnerUsername;
+    }
+    return requesterUsername ?? partnerUsername;
+  }
+
+  String? viewerPartnerAvatarUrl(String? viewerUserId) {
+    if (viewerUserId == null) return partnerAvatarUrl;
+    if (viewerUserId == requesterId) {
+      return responderAvatarUrl ?? partnerAvatarUrl;
+    }
+    return requesterAvatarUrl ?? partnerAvatarUrl;
+  }
+
   String? get expiryCountdown {
     if (expiresAt == null) return null;
     final diff = expiresAt!.difference(DateTime.now());
@@ -56,7 +98,6 @@ class SwapModel {
     return '${diff.inMinutes}m';
   }
 
-  /// Sort priority — lower = more urgent / shown first
   int get sortPriority {
     switch (swapStatus) {
       case SwapStatus.pending:
@@ -101,6 +142,12 @@ class SwapModel {
       responderId: map['responder_id']?.toString(),
       offeredSkill: map['offered_skill']?.toString(),
       wantedSkill: map['wanted_skill']?.toString(),
+      requesterName: map['requester_name']?.toString(),
+      requesterUsername: map['requester_username']?.toString(),
+      requesterAvatarUrl: map['requester_avatar_url']?.toString(),
+      responderName: map['responder_name']?.toString(),
+      responderUsername: map['responder_username']?.toString(),
+      responderAvatarUrl: map['responder_avatar_url']?.toString(),
     );
   }
 
@@ -124,6 +171,12 @@ class SwapModel {
     'responder_id': responderId,
     'offered_skill': offeredSkill,
     'wanted_skill': wantedSkill,
+    'requester_name': requesterName,
+    'requester_username': requesterUsername,
+    'requester_avatar_url': requesterAvatarUrl,
+    'responder_name': responderName,
+    'responder_username': responderUsername,
+    'responder_avatar_url': responderAvatarUrl,
   };
 }
 

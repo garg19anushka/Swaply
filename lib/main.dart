@@ -9,6 +9,7 @@ import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/swap_service.dart';
 import 'screens/splash_screen.dart';
+import 'screens/swaps/all_swaps_screen.dart';
 import 'utils/app_theme.dart';
 import 'services/leaderboard_service.dart';
 
@@ -64,6 +65,7 @@ class Swaply extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
+            routes: {'/my_swaps': (_) => const AllSwapsScreen()},
             home:
                 const SplashScreen(), // ← Keep this. SplashScreen routes to HomeScreen after auth.
           );
