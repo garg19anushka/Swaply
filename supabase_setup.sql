@@ -146,8 +146,18 @@ alter table public.profiles
 
 
 -- ==========================================
--- 5. SWAPS TABLE & POLICIES
+-- 7. POSTS TABLE: expires_at column
 -- ==========================================
+-- Posts expire 30 days after creation by default.
+-- The Edge Function checks this column daily to send expiry notifications.
+alter table public.posts
+  add column if not exists expires_at timestamp with time zone
+  default (now() + interval '30 days');
+
+-- Backfill existing posts that don't have an expiry yet
+update public.posts
+  set expires_at = created_at + interval '30 days'
+  where expires_at is null;
 -- Used by SwapService (fetchActiveSwaps, fetchAllSwaps, confirmSwap,
 -- completeSession). Column names must match swap_model.dart exactly,
 -- in particular requester_id / responder_id (NOT user_id / partner_id).

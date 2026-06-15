@@ -264,6 +264,32 @@ class PostService extends ChangeNotifier {
     }
   }
 
+  // ── renew a post (extend expires_at by 30 days from now) ─────────────────
+  Future<bool> renewPost(String postId) async {
+    if (_uid == null) return false;
+    try {
+      final newExpiry = DateTime.now().add(const Duration(days: 30));
+      await _supabase
+          .from('posts')
+          .update({'expires_at': newExpiry.toIso8601String()})
+          .eq('id', postId)
+          .eq('user_id', _uid!); // safety: only the owner can renew
+
+      // Update the local list so the UI reflects immediately
+      for (final list in [_posts, _openRequests]) {
+        final idx = list.indexWhere((p) => p.id == postId);
+        if (idx != -1) {
+          list[idx] = list[idx].copyWith(expiresAt: newExpiry);
+        }
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('PostService.renewPost error: $e');
+      return false;
+    }
+  }
+
   // ── toggle bookmark ────────────────────────────────────────────────────────
   Future<void> toggleBookmark(String postId) async {
     if (_uid == null) return;

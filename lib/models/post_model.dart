@@ -43,15 +43,16 @@ class PostModel {
   final String title;
   final String description;
   final String skillOffered;
-  final String? skillWanted; // nullable — not set for custom/open requests
+  final String? skillWanted;
   final List<String> tags;
   final int bookmarksCount;
   final int swapCount;
-  final String exchangeType; // 'barter' | 'custom'
+  final String exchangeType;
   final String? customOffer;
   final bool isOpenRequest;
   final bool isBookmarked;
   final DateTime createdAt;
+  final DateTime? expiresAt; // used by expiry notifications + Edge Function
   final ProfileModel? profile;
 
   PostModel({
@@ -69,8 +70,17 @@ class PostModel {
     this.isOpenRequest = false,
     this.isBookmarked = false,
     required this.createdAt,
+    this.expiresAt,
     this.profile,
   });
+
+  // Convenience helpers used in the UI
+  bool get isExpired =>
+      expiresAt != null && expiresAt!.isBefore(DateTime.now());
+
+  int? get hoursUntilExpiry => expiresAt == null
+      ? null
+      : expiresAt!.difference(DateTime.now()).inHours.clamp(0, 99999);
 
   factory PostModel.fromMap(
     Map<String, dynamic> map, {
@@ -86,7 +96,7 @@ class PostModel {
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       skillOffered: map['skill_offered'] ?? '',
-      skillWanted: map['skill_wanted'], // stays nullable
+      skillWanted: map['skill_wanted'],
       tags: List<String>.from(map['tags'] ?? []),
       bookmarksCount: map['bookmarks_count'] ?? map['save_count'] ?? 0,
       swapCount: map['swap_count'] ?? 0,
@@ -95,6 +105,9 @@ class PostModel {
       isOpenRequest: map['is_open_request'] ?? false,
       isBookmarked: isBookmarked,
       createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
+      expiresAt: map['expires_at'] != null
+          ? DateTime.tryParse(map['expires_at'].toString())
+          : null,
       profile: profile,
     );
   }
@@ -102,6 +115,7 @@ class PostModel {
   PostModel copyWith({
     bool? isBookmarked,
     int? bookmarksCount,
+    DateTime? expiresAt,
     ProfileModel? profile,
   }) {
     return PostModel(
@@ -119,6 +133,7 @@ class PostModel {
       isOpenRequest: isOpenRequest,
       isBookmarked: isBookmarked ?? this.isBookmarked,
       createdAt: createdAt,
+      expiresAt: expiresAt ?? this.expiresAt,
       profile: profile ?? this.profile,
     );
   }

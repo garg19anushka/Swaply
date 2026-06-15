@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/chat_model.dart';
 import '../../services/notification_service.dart';
+import '../../services/post_service.dart';
 import '../../services/swap_service.dart';
 import '../../utils/app_theme.dart';
 import '../swaps/all_swaps_screen.dart';
@@ -153,10 +154,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _snack('Request declined');
   }
 
-  void _renewPost(NotificationModel n) {
+  Future<void> _renewPost(NotificationModel n) async {
     setState(() => _renewedIds.add(n.id));
     _markOneRead(n);
-    _snack('Post renewed for 30 more days ✅');
+    final postId = n.data['post_id'] as String?;
+    if (postId != null) {
+      final success = await context.read<PostService>().renewPost(postId);
+      if (success) {
+        _snack('Post renewed for 30 more days ✅');
+      } else {
+        setState(() => _renewedIds.remove(n.id)); // revert on failure
+        _snack('Could not renew post. Please try again.');
+      }
+    } else {
+      _snack('Post renewed ✅');
+    }
   }
 
   void _snack(String msg) {
