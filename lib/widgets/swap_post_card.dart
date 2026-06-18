@@ -1,3 +1,5 @@
+// lib/widgets/swap_post_card.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,9 +7,6 @@ import 'package:provider/provider.dart';
 import 'package:Swaply/models/post_model.dart';
 import 'package:Swaply/utils/app_theme.dart';
 import 'package:Swaply/services/post_service.dart';
-import 'package:Swaply/services/chat_service.dart';
-import 'package:Swaply/services/auth_service.dart';
-import 'package:Swaply/screens/chat/chat_screen.dart';
 
 typedef PostCard = SwapPostCard;
 
@@ -42,26 +41,60 @@ class _SwapPostCardState extends State<SwapPostCard> {
 
   bool get _d => Theme.of(context).brightness == Brightness.dark;
 
-  Color get _cardBg => _d ? const Color(0xFF111828) : const Color(0xFF141828);
-  Color get _cardBd => _d ? const Color(0xFF1E2A3A) : const Color(0xFF1E2A3A);
-  Color get _tp => const Color(0xFFF1F5FB);
-  Color get _ts => const Color(0xFF8090A8);
-  Color get _tl => const Color(0xFF4A5A6E);
-  Color get _boxBg => const Color(0xFF0D1520);
-  Color get _boxBd => const Color(0xFF1E2E42);
-  Color get _chipBg => const Color(0xFF1A2535);
-  Color get _chipBd => const Color(0xFF253447);
-  Color get _chipTxt => const Color(0xFF7BA7D4);
-  Color get _saveBg => const Color(0xFF1A2535);
-  Color get _saveBd => const Color(0xFF2A3A50);
+  // ── Card shell ───────────────────────────────────────────────────────────────
+  Color get _cardBg => _d ? const Color(0xFF111828) : const Color(0xFFFFFFFF);
+  Color get _cardBd => _d ? const Color(0xFF1E2A3A) : const Color(0xFFDDE3EE);
 
-  static const _offClr = Color(0xFF7C5CFC);
-  static const _wantClr = Color(0xFFFF6B6B);
+  // ── Text colours ─────────────────────────────────────────────────────────────
+  Color get _tp => _d ? const Color(0xFFF1F5FB) : const Color(0xFF0F1828);
+  Color get _ts => _d ? const Color(0xFF8090A8) : const Color(0xFF5A6A7E);
+  Color get _tl => _d ? const Color(0xFF4A5A6E) : const Color(0xFF8090A8);
 
-  // ── Swap button colours — matches notifications bar purple ────────────────
+  // ── Offers/Wants panel — two independent boxes ───────────────────────────────
+  // OFFERS box
+  Color get _offBoxBg => _d ? const Color(0xFF0D1520) : const Color(0xFFEFF2FD);
+  Color get _offBoxBd => _d ? const Color(0xFF1E2E42) : const Color(0xFFCDD4EE);
+
+  // WANTS box
+  Color get _wantBoxBg =>
+      _d ? const Color(0xFF150D1A) : const Color(0xFFFDF0EE);
+  Color get _wantBoxBd =>
+      _d ? const Color(0xFF2E1E2A) : const Color(0xFFEECDC8);
+
+  // Floating swap icon between boxes
+  Color get _swapIconBg =>
+      _d ? const Color(0xFF1A2535) : const Color(0xFFECEEFA);
+  Color get _swapIconBd =>
+      _d ? const Color(0xFF253447) : const Color(0xFFD0D4EC);
+  Color get _swapIconClr =>
+      _d ? const Color(0xFF5A7A9A) : const Color(0xFF8890C0);
+
+  // Panel label (OFFERS / WANTS small-caps)
+  Color get _panelLabelCol =>
+      _d ? const Color(0xFF4A5A72) : const Color(0xFF9098B8);
+
+  // ── Tags/chips ───────────────────────────────────────────────────────────────
+  Color get _chipBg => _d ? const Color(0xFF1A2535) : const Color(0xFFECEEFA);
+  Color get _chipBd => _d ? const Color(0xFF253447) : const Color(0xFFD0D4EC);
+  Color get _chipTxt => _d ? const Color(0xFF7BA7D4) : const Color(0xFF4A66A8);
+
+  // ── Save button ──────────────────────────────────────────────────────────────
+  Color get _saveBg => _d ? const Color(0xFF1A2535) : const Color(0xFFF0F2FA);
+  Color get _saveBd => _d ? const Color(0xFF2A3A50) : const Color(0xFFCDD4EE);
+
+  // ── Value colours — same feel in both themes ──────────────────────────────
+  static const _offClr = Color(
+    0xFF7C5CFC,
+  ); // offers purple — vivid enough on both
+  static const _wantClr = Color(
+    0xFFE05A5A,
+  ); // wants red — readable on light & dark
+
+  // ── Swap button gradient — unchanged ─────────────────────────────────────────
   static const _swapA = Color(0xFF6860E8);
   static const _swapB = Color(0xFF5B52D0);
 
+  // ── Avatar gradients ─────────────────────────────────────────────────────────
   static const _grads = [
     [Color(0xFF7C5CFC), Color(0xFFFF4D7D)],
     [Color(0xFF00C9A7), Color(0xFF4CC9F0)],
@@ -70,6 +103,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
     [Color(0xFFFF4D6D), Color(0xFFFF9F43)],
   ];
 
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   String get _initials {
     final n =
         widget.post.profile?.fullName ?? widget.post.profile?.username ?? '?';
@@ -99,37 +133,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
   }
 
   Future<void> _onSwapTap() async {
-    if (widget.isOwn) {
-      widget.onSwap?.call();
-      return;
-    }
-    final authorId = widget.post.userId;
-    final myId = context.read<AuthService>().currentUser?.id;
-    if (authorId == null || myId == null || myId == authorId) {
-      widget.onSwap?.call();
-      return;
-    }
-    setState(() => _swapping = true);
-    HapticFeedback.mediumImpact();
-    try {
-      final chat = await context.read<ChatService>().getOrCreateChat(
-        otherUserId: authorId,
-        postId: widget.post.id,
-      );
-      if (!mounted) return;
-      if (chat != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
-        );
-      } else {
-        _snack('Could not open chat. Try again.');
-      }
-    } catch (e) {
-      if (mounted) _snack('Error: $e');
-    } finally {
-      if (mounted) setState(() => _swapping = false);
-    }
+    widget.onSwap?.call();
   }
 
   Future<void> _onSaveTap() async {
@@ -155,6 +159,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
     );
   }
 
+  // ── build ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
@@ -172,7 +177,9 @@ class _SwapPostCardState extends State<SwapPostCard> {
           border: Border.all(color: _cardBd, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.45),
+              color: _d
+                  ? Colors.black.withOpacity(0.45)
+                  : const Color(0xFFB0C0D8).withOpacity(0.20),
               blurRadius: 24,
               offset: const Offset(0, 6),
             ),
@@ -203,6 +210,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
     );
   }
 
+  // ── Header ───────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -300,6 +308,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
     ),
   );
 
+  // ── OFFERS / WANTS — two independent rounded boxes ───────────────────────────
   Widget _buildOffersWants(PostModel post) {
     final isBarter = post.exchangeType == 'barter';
     final wantLabel = isBarter ? 'WANTS' : 'OFFERS';
@@ -309,98 +318,93 @@ class _SwapPostCardState extends State<SwapPostCard> {
               : 'Any Skill')
         : (post.customOffer ?? 'Custom');
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _boxBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _boxBd, width: 1),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 13, 10, 13),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'OFFERS',
-                      style: GoogleFonts.dmSans(
-                        color: const Color(0xFF4A5A72),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      post.skillOffered,
-                      style: GoogleFonts.dmSans(
-                        color: _offClr,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A2535),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF253447), width: 1),
-                ),
-                child: const Icon(
-                  Icons.swap_vert_rounded,
-                  size: 16,
-                  color: Color(0xFF5A7A9A),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 13, 14, 13),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      wantLabel,
-                      style: GoogleFonts.dmSans(
-                        color: const Color(0xFF4A5A72),
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      wantValue,
-                      style: GoogleFonts.dmSans(
-                        color: _wantClr,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // ── Left: OFFERS ──────────────────────────────────────────────────────
+        Expanded(
+          child: _skillBox(
+            label: 'OFFERS',
+            value: post.skillOffered,
+            valueColor: _offClr,
+            bg: _offBoxBg,
+            borderColor: _offBoxBd,
+          ),
         ),
+
+        // ── Free-floating swap icon in gap ────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: _swapIconBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _swapIconBd, width: 1),
+            ),
+            child: Icon(Icons.swap_vert_rounded, size: 16, color: _swapIconClr),
+          ),
+        ),
+
+        // ── Right: WANTS ──────────────────────────────────────────────────────
+        Expanded(
+          child: _skillBox(
+            label: wantLabel,
+            value: wantValue,
+            valueColor: _wantClr,
+            bg: _wantBoxBg,
+            borderColor: _wantBoxBd,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _skillBox({
+    required String label,
+    required String value,
+    required Color valueColor,
+    required Color bg,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.dmSans(
+              color: _panelLabelCol,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: GoogleFonts.dmSans(
+              color: valueColor,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ],
       ),
     );
   }
 
+  // ── Tags ─────────────────────────────────────────────────────────────────────
   Widget _buildTags(List<String> tags) => Wrap(
     spacing: 7,
     runSpacing: 7,
@@ -426,6 +430,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
         .toList(),
   );
 
+  // ── Footer ───────────────────────────────────────────────────────────────────
   Widget _buildFooter(PostModel post, int saves) {
     final saved = post.isBookmarked;
 
@@ -443,10 +448,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
           ),
         ),
         const SizedBox(width: 10),
-        const Text(
-          '⇅',
-          style: TextStyle(fontSize: 13, color: Color(0xFF5A7A9A)),
-        ),
+        Text('⇅', style: TextStyle(fontSize: 13, color: _swapIconClr)),
         const SizedBox(width: 4),
         Text(
           '${post.bookmarksCount > 0 ? (post.bookmarksCount * 0.6).round() : 0} swaps',
@@ -466,9 +468,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: saved
-                    ? AppColors.primary.withOpacity(0.12)
-                    : Colors.transparent,
+                color: saved ? AppColors.primary.withOpacity(0.12) : _saveBg,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
                   color: saved ? AppColors.primary.withOpacity(0.6) : _saveBd,
@@ -501,7 +501,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
 
         if (!widget.isOwn) const SizedBox(width: 8),
 
-        // Swap button — solid purple matching notifications bar
+        // Swap button — same gradient in both themes
         if (!widget.isOwn)
           GestureDetector(
             onTap: _swapping ? null : _onSwapTap,
@@ -522,7 +522,7 @@ class _SwapPostCardState extends State<SwapPostCard> {
                     ? []
                     : [
                         BoxShadow(
-                          color: _swapB.withOpacity(0.40),
+                          color: _swapB.withOpacity(_d ? 0.40 : 0.25),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -585,10 +585,12 @@ class _SwapPostCardState extends State<SwapPostCard> {
   }
 }
 
+// ── Small icon button used for edit/delete on own posts ──────────────────────
 class _SmallBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+
   const _SmallBtn({
     required this.icon,
     required this.color,

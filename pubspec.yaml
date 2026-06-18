@@ -22,7 +22,6 @@ dependencies:
   badges: ^3.1.2
   cached_network_image: ^3.3.1
   uuid: ^4.4.0
-  google_generative_ai: ^0.4.7
   flutter_svg: ^2.2.4
   record: ^5.1.2
   path_provider: ^2.1.4

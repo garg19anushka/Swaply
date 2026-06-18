@@ -15,7 +15,6 @@
         "flutter_rating_bar",
         "flutter_svg",
         "google_fonts",
-        "google_generative_ai",
         "image_picker",
         "path_provider",
         "provider",
@@ -119,13 +118,6 @@
         "vector_graphics",
         "vector_graphics_codec",
         "vector_graphics_compiler"
-      ]
-    },
-    {
-      "name": "google_generative_ai",
-      "version": "0.4.7",
-      "dependencies": [
-        "http"
       ]
     },
     {

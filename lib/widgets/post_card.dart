@@ -45,48 +45,74 @@ class _PostCardState extends State<PostCard>
   // ── theme ────────────────────────────────────────────────────────────────────
   bool get _dark => Theme.of(context).brightness == Brightness.dark;
 
+  // Card shell
   Color get _cardBg =>
-      _dark ? const Color(0xFF12152A) : const Color(0xFFF8F9FA);
+      _dark ? const Color(0xFF12152A) : const Color(0xFFFFFFFF);
   Color get _cardBdr =>
-      _dark ? const Color(0xFF1E2240) : const Color(0xFFE2E6F0);
-  Color get _panelBg =>
-      _dark ? const Color(0xFF0D0D1A) : const Color(0xFFEEF0F8);
-  Color get _panelBdr =>
-      _dark ? const Color(0xFF1A1D30) : const Color(0xFFD8DCF0);
-  Color get _titleCol => _dark ? Colors.white : const Color(0xFF0F1220);
+      _dark ? const Color(0xFF1E2240) : const Color(0xFFDDE1F0);
+
+  // Text
+  Color get _titleCol =>
+      _dark ? const Color(0xFFF1F5FB) : const Color(0xFF0F1220);
   Color get _descCol =>
       _dark ? const Color(0xFF8A8FA8) : const Color(0xFF5A6080);
   Color get _metaCol =>
-      _dark ? const Color(0xFF8A8FA8) : const Color(0xFF8A90A8);
-  Color get _labelCol =>
-      _dark ? const Color(0xFF8A8FA8) : const Color(0xFF8A90A8);
+      _dark ? const Color(0xFF8A8FA8) : const Color(0xFF7A80A0);
+
+  // Avatar
+  Color get _avatarBg =>
+      _dark ? const Color(0xFF6C63FF) : const Color(0xFF5B52D0);
+
+  // Offers / Wants panel — two fully distinct boxes
+  Color get _offersPanelBg =>
+      _dark ? const Color(0xFF0E1128) : const Color(0xFFEFF1FD);
+  Color get _wantsPanelBg =>
+      _dark ? const Color(0xFF120E16) : const Color(0xFFFDF0EE);
+  Color get _offersPanelBdr =>
+      _dark ? const Color(0xFF252A4A) : const Color(0xFFCDD2EE);
+  Color get _wantsPanelBdr =>
+      _dark ? const Color(0xFF3A2030) : const Color(0xFFEECDC8);
+
+  // Value text colours
   Color get _offersCol =>
-      _dark ? const Color(0xFF7B6EF6) : const Color(0xFF3B48C8);
+      _dark ? const Color(0xFF7B6EF6) : const Color(0xFF4A3DC8);
   Color get _wantsCol =>
-      _dark ? const Color(0xFFE8855A) : const Color(0xFFBF5C3A);
-  Color get _tagBg => _dark ? const Color(0xFF1A1D2E) : const Color(0xFFEAECF8);
+      _dark ? const Color(0xFFE8855A) : const Color(0xFFBF4A30);
+
+  // Arrow icon between panels
+  Color get _arrowCol =>
+      _dark ? const Color(0xFF6870A8) : const Color(0xFFAAAAAA);
+
+  // Label text (OFFERS / WANTS small-caps)
+  Color get _labelCol =>
+      _dark ? const Color(0xFF7880B0) : const Color(0xFF9098C0);
+
+  // Tags
+  Color get _tagBg => _dark ? const Color(0xFF1A1D2E) : const Color(0xFFECEEFA);
   Color get _tagBdr =>
       _dark ? const Color(0xFF2E3150) : const Color(0xFFD0D4EC);
   Color get _tagTxt =>
       _dark ? const Color(0xFF7B8BD4) : const Color(0xFF4A56A8);
-  Color get _avatarBg =>
-      _dark ? const Color(0xFF6C63FF) : const Color(0xFF5B52D0);
-  Color get _swapA => const Color(0xFF6860E8);
-  Color get _swapB => const Color(0xFF5B52D0);
-  Color get _shadow => _dark
-      ? Colors.black.withOpacity(0.38)
-      : const Color(0xFFB0B8D8).withOpacity(0.22);
 
-  // Save button colours
+  // Save button
   Color get _saveBg => widget.post.isBookmarked
       ? (_dark ? const Color(0xFF2A2D44) : const Color(0xFFEAE8FF))
-      : (_dark ? const Color(0xFF1A1D2E) : const Color(0xFFEEF0F8));
+      : (_dark ? const Color(0xFF1A1D2E) : const Color(0xFFF0F1FA));
   Color get _saveBdr => widget.post.isBookmarked
       ? (_dark ? const Color(0xFF6C63FF) : const Color(0xFF5B52D0))
       : (_dark ? const Color(0xFF2E3150) : const Color(0xFFD0D4EC));
   Color get _saveTxt => widget.post.isBookmarked
       ? (_dark ? const Color(0xFF6C63FF) : const Color(0xFF5B52D0))
-      : (_dark ? const Color(0xFFB0B8D4) : const Color(0xFF5A6080));
+      : (_dark ? const Color(0xFFB0B8D4) : const Color(0xFF7A80A0));
+
+  // Swap button gradient — same in both modes
+  Color get _swapA => const Color(0xFF6860E8);
+  Color get _swapB => const Color(0xFF5B52D0);
+
+  // Drop shadow
+  Color get _shadow => _dark
+      ? Colors.black.withOpacity(0.38)
+      : const Color(0xFFB0B8D8).withOpacity(0.18);
 
   // ── helpers ──────────────────────────────────────────────────────────────────
   String _initials(String name) {
@@ -169,20 +195,7 @@ class _PostCardState extends State<PostCard>
     );
   }
 
-  // ── OFFERS / WANTS panel ─────────────────────────────────────────────────────
-
-  // Panel background tones — slightly distinct per side for visual separation
-  Color get _offersPanelBg => _dark
-      ? const Color(0xFF0E1128) // deep navy-blue tint
-      : const Color(0xFFECEEFA);
-  Color get _wantsPanelBg => _dark
-      ? const Color(0xFF120E16) // deep maroon-dark tint
-      : const Color(0xFFFAECEC);
-  Color get _offersPanelBdr =>
-      _dark ? const Color(0xFF252A4A) : const Color(0xFFCDD2EE);
-  Color get _wantsPanelBdr =>
-      _dark ? const Color(0xFF3A2030) : const Color(0xFFEECDCD);
-
+  // ── OFFERS / WANTS — two independent rounded containers ──────────────────────
   Widget _offersWantsPanel() {
     final isCustom = widget.post.exchangeType == 'custom';
     final rightLabel = isCustom ? 'OFFERS' : 'WANTS';
@@ -191,48 +204,37 @@ class _PostCardState extends State<PostCard>
         : (widget.post.skillWanted ?? '—');
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Left box: OFFERS ───────────────────────────────────────────────
+        // ── Left: OFFERS box ──────────────────────────────────────────────────
         Expanded(
           child: _skillBox(
             label: 'OFFERS',
-            value: widget.post.skillOffered, // ← live from Supabase
+            value: widget.post.skillOffered,
             valueColor: _offersCol,
             bg: _offersPanelBg,
             borderColor: _offersPanelBdr,
           ),
         ),
 
-        // ── Free-floating ↑↓ icon in the gap ──────────────────────────────
+        // ── Free-floating ↑↓ arrows in the gap ───────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.arrow_upward_rounded,
-                color: _dark
-                    ? const Color(0xFF6870A8)
-                    : const Color(0xFF8890C0),
-                size: 13,
-              ),
+              Icon(Icons.arrow_upward_rounded, color: _arrowCol, size: 13),
               const SizedBox(height: 1),
-              Icon(
-                Icons.arrow_downward_rounded,
-                color: _dark
-                    ? const Color(0xFF6870A8)
-                    : const Color(0xFF8890C0),
-                size: 13,
-              ),
+              Icon(Icons.arrow_downward_rounded, color: _arrowCol, size: 13),
             ],
           ),
         ),
 
-        // ── Right box: WANTS ───────────────────────────────────────────────
+        // ── Right: WANTS box ──────────────────────────────────────────────────
         Expanded(
           child: _skillBox(
             label: rightLabel,
-            value: rightValue, // ← live from Supabase
+            value: rightValue,
             valueColor: _wantsCol,
             bg: _wantsPanelBg,
             borderColor: _wantsPanelBdr,
@@ -260,18 +262,16 @@ class _PostCardState extends State<PostCard>
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Label — small caps, muted
           Text(
             label,
             style: GoogleFonts.poppins(
-              color: _dark ? const Color(0xFF7880B0) : const Color(0xFF8890C0),
+              color: _labelCol,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.8,
             ),
           ),
           const SizedBox(height: 6),
-          // Value — bound to live Supabase field
           Text(
             value,
             style: GoogleFonts.poppins(
@@ -434,7 +434,7 @@ class _PostCardState extends State<PostCard>
     );
   }
 
-  // ── build ────────────────────────────────────────────────────────────────────
+  // ── build ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Container(
