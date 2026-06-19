@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/chat_model.dart';
+import '../../models/post_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../utils/app_theme.dart';
@@ -31,7 +32,11 @@ import 'rate_swap_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final ChatModel chat;
-  const ChatScreen({super.key, required this.chat});
+
+  /// Pass the [PostModel] when opening from Skill Details → Start a Chat.
+  /// The swap context banner will be shown at the top of the chat.
+  final PostModel? sourcePost;
+  const ChatScreen({super.key, required this.chat, this.sourcePost});
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
@@ -42,6 +47,10 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   MessageModel? _replyTarget;
   String? _selectedMsgId;
+  // Index after which the swap banner is inserted.
+  // Set once when messages first load — equals the message count at that moment.
+  // Banner sits between old messages and any new ones sent after opening.
+  int? _bannerAfterIndex;
 
   // ── theme shortcuts ──────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
@@ -68,7 +77,12 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     final cs = context.read<ChatService>();
-    cs.fetchMessages(widget.chat.id).then((_) => _scrollToBottom());
+    cs.fetchMessages(widget.chat.id).then((_) {
+      if (widget.sourcePost != null && mounted) {
+        setState(() => _bannerAfterIndex = cs.messages.length);
+      }
+      _scrollToBottom();
+    });
     cs.subscribeToChat(widget.chat.id);
   }
 
@@ -1318,9 +1332,29 @@ class _ChatScreenState extends State<ChatScreen> {
                           8,
                         ),
                         physics: const BouncingScrollPhysics(),
-                        itemCount: cs.messages.length,
+                        itemCount:
+                            cs.messages.length +
+                            (_bannerAfterIndex != null ? 1 : 0),
                         itemBuilder: (_, i) {
-                          final msg = cs.messages[i];
+                          // ── Swap context banner pinned at fixed position ──
+                          // Inserted after _bannerAfterIndex messages (the count
+                          // when the chat was first opened from a swap).
+                          // New messages appear below the banner, old ones above.
+                          if (_bannerAfterIndex != null &&
+                              i == _bannerAfterIndex) {
+                            return _SwapContextBanner(
+                              post: widget.sourcePost!,
+                              isDark: _d,
+                            );
+                          }
+
+                          // Shift real message index down by 1 for items after banner
+                          final msgIndex =
+                              (_bannerAfterIndex != null &&
+                                  i > _bannerAfterIndex!)
+                              ? i - 1
+                              : i;
+                          final msg = cs.messages[msgIndex];
                           final isMe = msg.senderId == myId;
                           if (msg.messageType == 'system') {
                             return _sysMsg(msg.content ?? '');
@@ -1365,7 +1399,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                     showMenuIcon: showMenu,
                                     onMenuTap: () => _onLongPress(msg),
                                   ).animate().fadeIn(
-                                    delay: Duration(milliseconds: i * 18),
+                                    delay: Duration(
+                                      milliseconds: msgIndex * 18,
+                                    ),
                                   ),
                             ),
                           );
@@ -1928,6 +1964,175 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     ),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Swap Context Banner
+//  Shows at the top of the chat when opened from Skill Details → Start a Chat.
+//  Both participants see which swap this chat originated from.
+//  Dark: deep violet card with purple border.
+//  Light: soft lavender card with purple border.
+// ─────────────────────────────────────────────────────────────────────────────
+class _SwapContextBanner extends StatelessWidget {
+  final PostModel post;
+  final bool isDark;
+  const _SwapContextBanner({required this.post, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final d = isDark;
+    final post = this.post;
+
+    // Theme-aware colors
+    final bannerBg = d ? const Color(0xFF1A1730) : const Color(0xFFF3F0FF);
+    final bannerBdr = d ? const Color(0xFF7C5CFC55) : const Color(0xFF7C5CFC44);
+    final iconBg = d ? const Color(0xFF7C5CFC22) : const Color(0xFF7C5CFC18);
+    final labelClr = const Color(0xFF7C5CFC);
+    final titleClr = d ? const Color(0xFFE0DEFF) : const Color(0xFF2D1F6E);
+    final offerBg = d ? const Color(0xFF7C5CFC22) : const Color(0xFFEDE9FF);
+    final offerText = d ? const Color(0xFFB39DFC) : const Color(0xFF5B3FD4);
+    final offerBdr = d ? const Color(0xFF7C5CFC44) : const Color(0xFFB8A9F4);
+    final wantBg = d ? const Color(0xFFFF6B6B18) : const Color(0xFFFFF0EE);
+    final wantText = d ? const Color(0xFFFF9494) : const Color(0xFFC0392B);
+    final wantBdr = d ? const Color(0xFFFF6B6B33) : const Color(0xFFF4B8B8);
+    final divClr = d ? const Color(0xFF2A2540) : const Color(0xFFDDD8FF);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(4, 8, 4, 12),
+      decoration: BoxDecoration(
+        color: bannerBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: bannerBdr, width: 1),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.swap_horiz_rounded,
+                      color: Color(0xFF7C5CFC),
+                      size: 18,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Text block
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Started from swap',
+                        style: GoogleFonts.dmSans(
+                          color: labelClr,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        post.title,
+                        style: GoogleFonts.dmSans(
+                          color: titleClr,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      // Pills row
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          _BannerPill(
+                            label: 'Offers: ${post.skillOffered}',
+                            bg: offerBg,
+                            textColor: offerText,
+                            border: offerBdr,
+                          ),
+                          if (post.skillWanted != null &&
+                              post.skillWanted!.isNotEmpty)
+                            _BannerPill(
+                              label: 'Wants: ${post.skillWanted!}',
+                              bg: wantBg,
+                              textColor: wantText,
+                              border: wantBdr,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Bottom divider
+          Container(
+            height: 1,
+            decoration: BoxDecoration(
+              color: divClr,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(14),
+                bottomRight: Radius.circular(14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small pill chip used inside the swap banner.
+class _BannerPill extends StatelessWidget {
+  final String label;
+  final Color bg, textColor, border;
+  const _BannerPill({
+    required this.label,
+    required this.bg,
+    required this.textColor,
+    required this.border,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: border, width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.dmSans(
+          color: textColor,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

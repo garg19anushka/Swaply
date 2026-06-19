@@ -19,17 +19,12 @@ class SwaplyLogoWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = size * 0.27;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          // Matches the icon: rich royal-blue → mid-purple
-          colors: [Color(0xFF3D4FD6), Color(0xFF6B5BE2)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(size * 0.27),
+        borderRadius: BorderRadius.circular(radius),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF3D4FD6).withOpacity(0.45),
@@ -39,7 +34,25 @@ class SwaplyLogoWidget extends StatelessWidget {
           ),
         ],
       ),
-      child: CustomPaint(painter: _SwaplyLogoPainter()),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.asset(
+          'assets/images/swaply_logo.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF3D4FD6), Color(0xFF6B5BE2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: CustomPaint(painter: _SwaplyLogoPainter()),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -61,30 +74,28 @@ class _SwaplyLogoPainter extends CustomPainter {
     // ── S SHAPE — top arc ────────────────────────────────────────────────
     final topArc = Path();
     topArc.moveTo(w * 0.73, h * 0.245);
+    topArc.cubicTo(w * 0.73, h * 0.10, w * 0.25, h * 0.10, w * 0.25, h * 0.295);
     topArc.cubicTo(
-      w * 0.73, h * 0.10,
-      w * 0.25, h * 0.10,
-      w * 0.25, h * 0.295,
-    );
-    topArc.cubicTo(
-      w * 0.25, h * 0.435,
-      w * 0.73, h * 0.435,
-      w * 0.73, h * 0.500,
+      w * 0.25,
+      h * 0.435,
+      w * 0.73,
+      h * 0.435,
+      w * 0.73,
+      h * 0.500,
     );
     canvas.drawPath(topArc, sPaint);
 
     // ── S SHAPE — bottom arc ─────────────────────────────────────────────
     final botArc = Path();
     botArc.moveTo(w * 0.27, h * 0.755);
+    botArc.cubicTo(w * 0.27, h * 0.90, w * 0.75, h * 0.90, w * 0.75, h * 0.705);
     botArc.cubicTo(
-      w * 0.27, h * 0.90,
-      w * 0.75, h * 0.90,
-      w * 0.75, h * 0.705,
-    );
-    botArc.cubicTo(
-      w * 0.75, h * 0.565,
-      w * 0.27, h * 0.565,
-      w * 0.27, h * 0.500,
+      w * 0.75,
+      h * 0.565,
+      w * 0.27,
+      h * 0.565,
+      w * 0.27,
+      h * 0.500,
     );
     canvas.drawPath(botArc, sPaint);
 

@@ -86,7 +86,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       if (chat != null) {
         await Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => ChatScreen(chat: chat)),
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(chat: chat, sourcePost: post),
+          ),
         );
       } else {
         _snack('Could not start chat. Please try again.');
