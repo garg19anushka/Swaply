@@ -47,9 +47,15 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isSending = false;
   MessageModel? _replyTarget;
   String? _selectedMsgId;
+
+  // The post this chat originated from — loaded from Supabase for BOTH users,
+  // not just the one who clicked "Start a Chat". This makes the banner visible
+  // to both participants permanently.
+  PostModel? _sourcePost;
+
   // Index after which the swap banner is inserted.
-  // Set once when messages first load — equals the message count at that moment.
-  // Banner sits between old messages and any new ones sent after opening.
+  // Loaded from Supabase (banner_after_index column on chats table).
+  // Saved once on first open from a swap, then read by both users forever.
   int? _bannerAfterIndex;
 
   // ── theme shortcuts ──────────────────────────────────────────
@@ -77,12 +83,40 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     final cs = context.read<ChatService>();
-    cs.fetchMessages(widget.chat.id).then((_) {
-      if (widget.sourcePost != null && mounted) {
-        setState(() => _bannerAfterIndex = cs.messages.length);
+
+    // Load messages first, then handle banner logic
+    cs.fetchMessages(widget.chat.id).then((_) async {
+      if (!mounted) return;
+
+      // ── Case 1: Opened from Skill Details (user clicked "Start a Chat") ──
+      // Save banner index to Supabase once so the other user also sees it.
+      if (widget.sourcePost != null) {
+        final idx = cs.messages.length;
+        await cs.saveBannerIndex(chatId: widget.chat.id, messageCount: idx);
+        if (mounted) {
+          setState(() {
+            _sourcePost = widget.sourcePost;
+            // Re-read from DB to get the saved value (handles race conditions)
+            _bannerAfterIndex = widget.chat.bannerAfterIndex ?? idx;
+          });
+        }
       }
-      _scrollToBottom();
+
+      // ── Case 2: Opened from chat list (both users on every reopen) ──
+      // Load the post and banner index from Supabase if the chat has a post_id.
+      if (widget.sourcePost == null && widget.chat.postId != null) {
+        final postData = await cs.fetchPostForChat(widget.chat.id);
+        if (postData != null && mounted) {
+          setState(() {
+            _sourcePost = PostModel.fromMap(postData);
+            _bannerAfterIndex = widget.chat.bannerAfterIndex;
+          });
+        }
+      }
+
+      if (mounted) _scrollToBottom();
     });
+
     cs.subscribeToChat(widget.chat.id);
   }
 
@@ -1341,9 +1375,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           // when the chat was first opened from a swap).
                           // New messages appear below the banner, old ones above.
                           if (_bannerAfterIndex != null &&
-                              i == _bannerAfterIndex) {
+                              i == _bannerAfterIndex &&
+                              _sourcePost != null) {
                             return _SwapContextBanner(
-                              post: widget.sourcePost!,
+                              post: _sourcePost!,
                               isDark: _d,
                             );
                           }

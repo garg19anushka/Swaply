@@ -13,6 +13,11 @@ class ChatModel {
   final ProfileModel? otherUser;
   int unreadCount;
 
+  /// How many messages existed when the chat was first opened from a swap post.
+  /// The swap context banner is permanently shown after this index.
+  /// Stored in Supabase so both participants see it in the same position.
+  final int? bannerAfterIndex;
+
   ChatModel({
     required this.id,
     this.postId,
@@ -25,10 +30,13 @@ class ChatModel {
     required this.createdAt,
     this.otherUser,
     this.unreadCount = 0,
+    this.bannerAfterIndex,
   });
 
-  factory ChatModel.fromJson(Map<String, dynamic> json,
-      {ProfileModel? otherUser}) {
+  factory ChatModel.fromJson(
+    Map<String, dynamic> json, {
+    ProfileModel? otherUser,
+  }) {
     return ChatModel(
       id: json['id'] ?? '',
       postId: json['post_id'],
@@ -36,12 +44,15 @@ class ChatModel {
       participant2: json['participant_2'] ?? '',
       lastMessage: json['last_message'],
       lastMessageAt: DateTime.parse(
-          json['last_message_at'] ?? DateTime.now().toIso8601String()),
+        json['last_message_at'] ?? DateTime.now().toIso8601String(),
+      ),
       swapConfirmed: json['swap_confirmed'] ?? false,
       swapStatus: json['swap_status'] ?? 'none',
       createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
       otherUser: otherUser,
+      bannerAfterIndex: json['banner_after_index'],
     );
   }
 }
@@ -85,7 +96,8 @@ class MessageModel {
       messageType: json['message_type'] ?? 'text',
       isRead: json['is_read'] ?? false,
       createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
       sender: json['profiles'] != null
           ? ProfileModel.fromJson(json['profiles'])
           : null,
@@ -134,7 +146,8 @@ class SwapModel {
           ? DateTime.parse(json['completed_at'])
           : null,
       createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 }
@@ -169,7 +182,8 @@ class RatingModel {
       rating: json['rating'] ?? 0,
       review: json['review'],
       createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
       rater: json['profiles'] != null
           ? ProfileModel.fromJson(json['profiles'])
           : null,
@@ -208,7 +222,8 @@ class NotificationModel {
       data: Map<String, dynamic>.from(json['data'] ?? {}),
       isRead: json['is_read'] ?? false,
       createdAt: DateTime.parse(
-          json['created_at'] ?? DateTime.now().toIso8601String()),
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
     );
   }
 }

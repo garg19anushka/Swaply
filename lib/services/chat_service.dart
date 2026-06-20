@@ -479,6 +479,51 @@ class ChatService extends ChangeNotifier {
     }
   }
 
+  /// Saves the banner position to Supabase so both participants see
+  /// the swap context banner at the same fixed spot permanently.
+  /// Only saves once — if banner_after_index is already set, does nothing.
+  Future<void> saveBannerIndex({
+    required String chatId,
+    required int messageCount,
+  }) async {
+    try {
+      final existing = await supabase
+          .from('chats')
+          .select('banner_after_index')
+          .eq('id', chatId)
+          .single();
+      if (existing['banner_after_index'] != null) return;
+      await supabase
+          .from('chats')
+          .update({'banner_after_index': messageCount})
+          .eq('id', chatId);
+    } catch (e) {
+      debugPrint('saveBannerIndex error: $e');
+    }
+  }
+
+  /// Fetches the post associated with a chat (via post_id on the chats table).
+  Future<Map<String, dynamic>?> fetchPostForChat(String chatId) async {
+    try {
+      final chatData = await supabase
+          .from('chats')
+          .select('post_id')
+          .eq('id', chatId)
+          .single();
+      final postId = chatData['post_id'];
+      if (postId == null) return null;
+      final postData = await supabase
+          .from('posts')
+          .select()
+          .eq('id', postId)
+          .maybeSingle();
+      return postData;
+    } catch (e) {
+      debugPrint('fetchPostForChat error: $e');
+      return null;
+    }
+  }
+
   Future<List<RatingModel>> fetchUserRatings(String userId) async {
     try {
       final data = await supabase

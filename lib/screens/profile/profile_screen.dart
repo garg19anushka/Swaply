@@ -13,6 +13,7 @@ import '../../services/chat_service.dart';
 import '../../services/post_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
+import '../../widgets/swaply_logo.dart';
 import '../auth/login_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import 'edit_profile_screen.dart';
@@ -912,18 +913,7 @@ class _ProfileDrawerState extends State<_ProfileDrawer> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.swap_horiz_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
+            const SwaplyLogoWidget(size: 36),
             const SizedBox(width: 10),
             Text(
               'About Swaply',

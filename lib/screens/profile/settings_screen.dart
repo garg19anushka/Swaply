@@ -8,6 +8,7 @@ import '../../utils/app_theme.dart';
 import '../auth/login_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import 'edit_profile_screen.dart';
+import '../../widgets/swaply_logo.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -1158,18 +1159,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 20),
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.swap_horiz_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
+                const SwaplyLogoWidget(size: 44),
                 const SizedBox(width: 12),
                 Text(
                   'About Swaply',

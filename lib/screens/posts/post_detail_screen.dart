@@ -1,17 +1,7 @@
 // lib/screens/posts/post_detail_screen.dart
 // ─────────────────────────────────────────────────────────────────────────────
-//  PostDetailScreen — full LIGHT theme
-//  Palette:
-//    bg          #F7F6FF  (faint lavender white — never cold paper)
-//    surface     #FFFFFF  (cards, app bar)
-//    border      #ECEAF9  (soft violet-tinted dividers)
-//    tp          #110D2E  (near-black with a violet cast)
-//    ts          #6B688E  (mid-tone violet-grey)
-//    tl          #AAA8C4  (placeholder / timestamps)
-//    purple      #6C47FF  (brand primary — AppColors.primary)
-//    coral       #FF4D6D  (AppColors.secondary / wants)
-//    amber       #FFBE0B  (warning / stars)
-//    teal        #00C9A7  (success / done)
+//  PostDetailScreen — supports LIGHT + DARK theme
+//  Bookmark icon moved to the top-right corner of the app bar.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
@@ -32,31 +22,6 @@ import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../swaps/all_swaps_screen.dart';
 
-// ── Light palette constants ───────────────────────────────────────────────────
-const _bg = Color(0xFFF7F6FF);
-const _surface = Color(0xFFFFFFFF);
-const _border = Color(0xFFECEAF9);
-const _tp = Color(0xFF110D2E);
-const _ts = Color(0xFF6B688E);
-const _tl = Color(0xFFAAA8C4);
-const _purple = Color(0xFF6C47FF);
-const _coral = Color(0xFFFF4D6D);
-const _amber = Color(0xFFFFBE0B);
-const _teal = Color(0xFF00C9A7);
-const _green = Color(0xFF4CAF7D);
-
-// Offers box
-const _offBoxBg = Color(0xFFF0EDFF);
-const _offBoxBd = Color(0xFFD4CCFF);
-
-// Wants box
-const _wantBoxBg = Color(0xFFFFF0F3);
-const _wantBoxBd = Color(0xFFFFCDD5);
-
-// Bottom bar card surface
-const _cardBg = Color(0xFFFFFFFF);
-const _cardBd = Color(0xFFECEAF9);
-
 class PostDetailScreen extends StatefulWidget {
   final PostModel post;
   const PostDetailScreen({super.key, required this.post});
@@ -71,6 +36,32 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _swapDone = false;
 
   PostModel get post => widget.post;
+
+  // ── theme-aware palette ───────────────────────────────────────────────────
+  bool get _d => Theme.of(context).brightness == Brightness.dark;
+
+  Color get _bg => _d ? const Color(0xFF0A0815) : const Color(0xFFF7F6FF);
+  Color get _surface => _d ? const Color(0xFF15122B) : const Color(0xFFFFFFFF);
+  Color get _border => _d ? const Color(0xFF272247) : const Color(0xFFECEAF9);
+  Color get _tp => _d ? const Color(0xFFF3F1FF) : const Color(0xFF110D2E);
+  Color get _ts => _d ? const Color(0xFFA9A5C9) : const Color(0xFF6B688E);
+  Color get _tl => _d ? const Color(0xFF6C6790) : const Color(0xFFAAA8C4);
+  Color get _purple => const Color(0xFF6C47FF);
+  Color get _coral => const Color(0xFFFF4D6D);
+  Color get _amber => const Color(0xFFFFBE0B);
+  Color get _teal => const Color(0xFF00C9A7);
+  Color get _green => const Color(0xFF4CAF7D);
+
+  Color get _offBoxBg => _d ? const Color(0xFF211C46) : const Color(0xFFF0EDFF);
+  Color get _offBoxBd => _d ? const Color(0xFF3C3470) : const Color(0xFFD4CCFF);
+
+  Color get _wantBoxBg =>
+      _d ? const Color(0xFF36172A) : const Color(0xFFFFF0F3);
+  Color get _wantBoxBd =>
+      _d ? const Color(0xFF5A2640) : const Color(0xFFFFCDD5);
+
+  Color get _cardBg => _surface;
+  Color get _cardBd => _border;
 
   // ── Navigation helpers ────────────────────────────────────────────────────
   Future<void> _startSwap() async {
@@ -243,11 +234,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: _border),
               ),
-              child: const Icon(
-                Icons.chevron_left_rounded,
-                color: _tp,
-                size: 22,
-              ),
+              child: Icon(Icons.chevron_left_rounded, color: _tp, size: 22),
             ),
           ),
         ),
@@ -261,6 +248,37 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
         ),
         centerTitle: true,
+        // ── Bookmark moved here, top-right corner ───────────────────────────
+        actions: [
+          GestureDetector(
+            onTap: _toggleSave,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 14, left: 6),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: post.isBookmarked ? _purple.withOpacity(0.10) : _bg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: post.isBookmarked
+                        ? _purple.withOpacity(0.45)
+                        : _border,
+                    width: post.isBookmarked ? 1.5 : 1,
+                  ),
+                ),
+                child: Icon(
+                  post.isBookmarked
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_outline_rounded,
+                  color: post.isBookmarked ? _purple : _ts,
+                  size: 19,
+                ),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Divider(height: 1, thickness: 1, color: _border),
@@ -275,9 +293,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               starting: _starting,
               requesting: _requesting,
               onMarkDone: _markSwapDone,
-              onToggleSave: _toggleSave,
               onRequestSwap: _requestSwap,
               onStartChat: _startSwap,
+              surface: _surface,
+              border: _border,
+              purple: _purple,
+              ts: _ts,
+              tl: _tl,
+              green: _green,
+              cardBg: _cardBg,
+              cardBd: _cardBd,
+              isDark: _d,
             ),
 
       body: SingleChildScrollView(
@@ -286,7 +312,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Hero header — gradient banner ─────────────────────────────
-            _HeroBanner(post: post),
+            _HeroBanner(
+              post: post,
+              isDark: _d,
+              border: _border,
+              tp: _tp,
+              tl: _tl,
+              amber: _amber,
+            ),
 
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
@@ -295,23 +328,50 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 children: [
                   // ── Tags ─────────────────────────────────────────────
                   if (post.tags.isNotEmpty) ...[
-                    _TagRow(post: post),
+                    _TagRow(
+                      post: post,
+                      purple: _purple,
+                      amber: _amber,
+                      teal: _teal,
+                      green: _green,
+                    ),
                     const SizedBox(height: 18),
                   ],
 
                   // ── Skill exchange card ───────────────────────────────
-                  _ExchangeCard(post: post)
+                  _ExchangeCard(
+                        post: post,
+                        surface: _surface,
+                        border: _border,
+                        bg: _bg,
+                        tl: _tl,
+                        purple: _purple,
+                        coral: _coral,
+                        offBoxBg: _offBoxBg,
+                        offBoxBd: _offBoxBd,
+                        wantBoxBg: _wantBoxBg,
+                        wantBoxBd: _wantBoxBd,
+                      )
                       .animate()
                       .fadeIn(delay: 80.ms)
                       .slideY(begin: 0.04, delay: 80.ms),
                   const SizedBox(height: 20),
 
                   // ── Author card ───────────────────────────────────────
-                  _AuthorCard(post: post).animate().fadeIn(delay: 120.ms),
+                  _AuthorCard(
+                    post: post,
+                    surface: _surface,
+                    border: _border,
+                    tp: _tp,
+                    ts: _ts,
+                    tl: _tl,
+                    amber: _amber,
+                    isDark: _d,
+                  ).animate().fadeIn(delay: 120.ms),
                   const SizedBox(height: 20),
 
                   // ── About ─────────────────────────────────────────────
-                  _SectionLabel(label: 'About this swap'),
+                  _SectionLabel(label: 'About this swap', tp: _tp),
                   const SizedBox(height: 8),
                   Text(
                     post.description,
@@ -325,22 +385,40 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                   // ── Availability ──────────────────────────────────────
                   if (_availabilityTags.isNotEmpty) ...[
-                    _SectionLabel(label: 'Availability'),
+                    _SectionLabel(label: 'Availability', tp: _tp),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: _availabilityTags
-                          .map((t) => _AvailPill(label: t))
+                          .map(
+                            (t) => _AvailPill(
+                              label: t,
+                              surface: _surface,
+                              border: _border,
+                              ts: _ts,
+                              isDark: _d,
+                            ),
+                          )
                           .toList(),
                     ).animate().fadeIn(delay: 160.ms),
                     const SizedBox(height: 24),
                   ],
 
                   // ── Stats ─────────────────────────────────────────────
-                  _SectionLabel(label: 'Swap Stats'),
+                  _SectionLabel(label: 'Swap Stats', tp: _tp),
                   const SizedBox(height: 10),
-                  _StatsRow(post: post).animate().fadeIn(delay: 180.ms),
+                  _StatsRow(
+                    post: post,
+                    surface: _surface,
+                    border: _border,
+                    tp: _tp,
+                    ts: _ts,
+                    purple: _purple,
+                    amber: _amber,
+                    coral: _coral,
+                    isDark: _d,
+                  ).animate().fadeIn(delay: 180.ms),
 
                   const SizedBox(height: 110),
                 ],
@@ -374,19 +452,38 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 class _HeroBanner extends StatelessWidget {
   final PostModel post;
-  const _HeroBanner({required this.post});
+  final bool isDark;
+  final Color border, tp, tl, amber;
+  const _HeroBanner({
+    required this.post,
+    required this.isDark,
+    required this.border,
+    required this.tp,
+    required this.tl,
+    required this.amber,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFEDE8FF), Color(0xFFFFF0F3), Color(0xFFF7F6FF)],
+          colors: isDark
+              ? [
+                  const Color(0xFF241D52),
+                  const Color(0xFF3A1830),
+                  const Color(0xFF0A0815),
+                ]
+              : [
+                  const Color(0xFFEDE8FF),
+                  const Color(0xFFFFF0F3),
+                  const Color(0xFFF7F6FF),
+                ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border(bottom: BorderSide(color: _border)),
+        border: Border(bottom: BorderSide(color: border)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       child: Column(
@@ -397,19 +494,19 @@ class _HeroBanner extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: _amber.withOpacity(0.12),
+                color: amber.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _amber.withOpacity(0.45)),
+                border: Border.all(color: amber.withOpacity(0.45)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lock_open_rounded, size: 12, color: _amber),
+                  Icon(Icons.lock_open_rounded, size: 12, color: amber),
                   const SizedBox(width: 5),
                   Text(
                     'Open Request',
                     style: GoogleFonts.dmSans(
-                      color: _amber,
+                      color: amber,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                     ),
@@ -420,7 +517,7 @@ class _HeroBanner extends StatelessWidget {
           Text(
             post.title,
             style: GoogleFonts.dmSans(
-              color: _tp,
+              color: tp,
               fontSize: 24,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.6,
@@ -428,21 +525,20 @@ class _HeroBanner extends StatelessWidget {
             ),
           ).animate().fadeIn().slideY(begin: 0.04),
           const SizedBox(height: 8),
-          // Small meta row
           Row(
             children: [
-              const Icon(Icons.schedule_rounded, size: 13, color: _tl),
+              Icon(Icons.schedule_rounded, size: 13, color: tl),
               const SizedBox(width: 4),
               Text(
                 timeago.format(post.createdAt),
-                style: GoogleFonts.dmSans(color: _tl, fontSize: 12),
+                style: GoogleFonts.dmSans(color: tl, fontSize: 12),
               ),
               const SizedBox(width: 12),
-              const Icon(Icons.bookmark_outline_rounded, size: 13, color: _tl),
+              Icon(Icons.bookmark_outline_rounded, size: 13, color: tl),
               const SizedBox(width: 4),
               Text(
                 '${post.bookmarksCount} saves',
-                style: GoogleFonts.dmSans(color: _tl, fontSize: 12),
+                style: GoogleFonts.dmSans(color: tl, fontSize: 12),
               ),
             ],
           ),
@@ -457,7 +553,21 @@ class _HeroBanner extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _ExchangeCard extends StatelessWidget {
   final PostModel post;
-  const _ExchangeCard({required this.post});
+  final Color surface, border, bg, tl, purple, coral;
+  final Color offBoxBg, offBoxBd, wantBoxBg, wantBoxBd;
+  const _ExchangeCard({
+    required this.post,
+    required this.surface,
+    required this.border,
+    required this.bg,
+    required this.tl,
+    required this.purple,
+    required this.coral,
+    required this.offBoxBg,
+    required this.offBoxBd,
+    required this.wantBoxBg,
+    required this.wantBoxBd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -471,9 +581,9 @@ class _ExchangeCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: _surface,
+        color: surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF6C47FF).withOpacity(0.07),
@@ -486,17 +596,16 @@ class _ExchangeCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // OFFERS
           Expanded(
             child: _SkillPanel(
               label: 'OFFERS',
               value: post.skillOffered,
-              valueColor: _purple,
-              bg: _offBoxBg,
-              borderColor: _offBoxBd,
+              valueColor: purple,
+              bg: offBoxBg,
+              borderColor: offBoxBd,
+              tl: tl,
             ),
           ),
-          // swap arrow
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Column(
@@ -506,27 +615,23 @@ class _ExchangeCard extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: _bg,
+                    color: bg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _border),
+                    border: Border.all(color: border),
                   ),
-                  child: const Icon(
-                    Icons.swap_vert_rounded,
-                    size: 17,
-                    color: _tl,
-                  ),
+                  child: Icon(Icons.swap_vert_rounded, size: 17, color: tl),
                 ),
               ],
             ),
           ),
-          // WANTS / OFFERS
           Expanded(
             child: _SkillPanel(
               label: wantLabel,
               value: wantValue,
-              valueColor: _coral,
-              bg: _wantBoxBg,
-              borderColor: _wantBoxBd,
+              valueColor: coral,
+              bg: wantBoxBg,
+              borderColor: wantBoxBd,
+              tl: tl,
             ),
           ),
         ],
@@ -537,13 +642,14 @@ class _ExchangeCard extends StatelessWidget {
 
 class _SkillPanel extends StatelessWidget {
   final String label, value;
-  final Color valueColor, bg, borderColor;
+  final Color valueColor, bg, borderColor, tl;
   const _SkillPanel({
     required this.label,
     required this.value,
     required this.valueColor,
     required this.bg,
     required this.borderColor,
+    required this.tl,
   });
 
   @override
@@ -561,7 +667,7 @@ class _SkillPanel extends StatelessWidget {
           Text(
             label,
             style: GoogleFonts.dmSans(
-              color: _tl,
+              color: tl,
               fontSize: 9.5,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.4,
@@ -590,7 +696,18 @@ class _SkillPanel extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _AuthorCard extends StatelessWidget {
   final PostModel post;
-  const _AuthorCard({required this.post});
+  final Color surface, border, tp, ts, tl, amber;
+  final bool isDark;
+  const _AuthorCard({
+    required this.post,
+    required this.surface,
+    required this.border,
+    required this.tp,
+    required this.ts,
+    required this.tl,
+    required this.amber,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -604,12 +721,12 @@ class _AuthorCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
-          color: _surface,
+          color: surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _border),
+          border: Border.all(color: border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withOpacity(isDark ? 0.18 : 0.04),
               blurRadius: 12,
               offset: const Offset(0, 3),
             ),
@@ -630,7 +747,7 @@ class _AuthorCard extends StatelessWidget {
                   Text(
                     post.profile?.displayName ?? 'Unknown',
                     style: GoogleFonts.dmSans(
-                      color: _tp,
+                      color: tp,
                       fontWeight: FontWeight.w700,
                       fontSize: 14.5,
                     ),
@@ -639,13 +756,12 @@ class _AuthorCard extends StatelessWidget {
                   Text(
                     '@${post.profile?.username ?? ''}'
                     '${(post.profile?.campus?.isNotEmpty == true) ? '  ·  ${post.profile!.campus}' : ''}',
-                    style: GoogleFonts.dmSans(color: _ts, fontSize: 12),
+                    style: GoogleFonts.dmSans(color: ts, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            // rating badge
             if ((post.profile?.averageRating ?? 0) > 0)
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -653,19 +769,19 @@ class _AuthorCard extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: _amber.withOpacity(0.10),
+                  color: amber.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _amber.withOpacity(0.3)),
+                  border: Border.all(color: amber.withOpacity(0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_rounded, size: 13, color: _amber),
+                    Icon(Icons.star_rounded, size: 13, color: amber),
                     const SizedBox(width: 3),
                     Text(
                       post.profile!.averageRating.toStringAsFixed(1),
                       style: GoogleFonts.dmSans(
-                        color: _amber,
+                        color: amber,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -674,7 +790,7 @@ class _AuthorCard extends StatelessWidget {
                 ),
               )
             else
-              const Icon(Icons.chevron_right_rounded, color: _tl, size: 20),
+              Icon(Icons.chevron_right_rounded, color: tl, size: 20),
           ],
         ),
       ),
@@ -687,7 +803,19 @@ class _AuthorCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _StatsRow extends StatelessWidget {
   final PostModel post;
-  const _StatsRow({required this.post});
+  final Color surface, border, tp, ts, purple, amber, coral;
+  final bool isDark;
+  const _StatsRow({
+    required this.post,
+    required this.surface,
+    required this.border,
+    required this.tp,
+    required this.ts,
+    required this.purple,
+    required this.amber,
+    required this.coral,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -696,7 +824,12 @@ class _StatsRow extends StatelessWidget {
         _StatBox(
           value: '${post.profile?.totalSwaps ?? 0}',
           label: 'Swaps done',
-          accentColor: _purple,
+          accentColor: purple,
+          surface: surface,
+          border: border,
+          tp: tp,
+          ts: ts,
+          isDark: isDark,
         ),
         const SizedBox(width: 10),
         _StatBox(
@@ -705,13 +838,23 @@ class _StatsRow extends StatelessWidget {
               : '–',
           label: 'Avg rating',
           icon: Icons.star_rounded,
-          accentColor: _amber,
+          accentColor: amber,
+          surface: surface,
+          border: border,
+          tp: tp,
+          ts: ts,
+          isDark: isDark,
         ),
         const SizedBox(width: 10),
         _StatBox(
           value: '${post.bookmarksCount}',
           label: 'Bookmarks',
-          accentColor: _coral,
+          accentColor: coral,
+          surface: surface,
+          border: border,
+          tp: tp,
+          ts: ts,
+          isDark: isDark,
         ),
       ],
     );
@@ -721,12 +864,18 @@ class _StatsRow extends StatelessWidget {
 class _StatBox extends StatelessWidget {
   final String value, label;
   final IconData? icon;
-  final Color accentColor;
+  final Color accentColor, surface, border, tp, ts;
+  final bool isDark;
   const _StatBox({
     required this.value,
     required this.label,
     this.icon,
     required this.accentColor,
+    required this.surface,
+    required this.border,
+    required this.tp,
+    required this.ts,
+    required this.isDark,
   });
 
   @override
@@ -735,12 +884,12 @@ class _StatBox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: _surface,
+          color: surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _border),
+          border: Border.all(color: border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withOpacity(isDark ? 0.18 : 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -759,7 +908,7 @@ class _StatBox extends StatelessWidget {
                 Text(
                   value,
                   style: GoogleFonts.dmSans(
-                    color: _tp,
+                    color: tp,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
@@ -770,7 +919,7 @@ class _StatBox extends StatelessWidget {
             Text(
               label,
               style: GoogleFonts.dmSans(
-                color: _ts,
+                color: ts,
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
@@ -787,14 +936,21 @@ class _StatBox extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _TagRow extends StatelessWidget {
   final PostModel post;
-  const _TagRow({required this.post});
+  final Color purple, amber, teal, green;
+  const _TagRow({
+    required this.post,
+    required this.purple,
+    required this.amber,
+    required this.teal,
+    required this.green,
+  });
 
   Color _color(String tag) {
     if (tag == 'Urgent') return AppColors.error;
-    if (tag == 'Quick Help') return _amber;
-    if (tag == 'Online' || tag == 'Online Only') return _teal;
-    if (tag == 'Beginner-friendly') return _green;
-    return _purple;
+    if (tag == 'Quick Help') return amber;
+    if (tag == 'Online' || tag == 'Online Only') return teal;
+    if (tag == 'Beginner-friendly') return green;
+    return purple;
   }
 
   @override
@@ -831,7 +987,15 @@ class _TagRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _AvailPill extends StatelessWidget {
   final String label;
-  const _AvailPill({required this.label});
+  final Color surface, border, ts;
+  final bool isDark;
+  const _AvailPill({
+    required this.label,
+    required this.surface,
+    required this.border,
+    required this.ts,
+    required this.isDark,
+  });
 
   String _emoji(String l) {
     if (l.contains('Weekend')) return '🗓';
@@ -850,12 +1014,12 @@ class _AvailPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
       decoration: BoxDecoration(
-        color: _surface,
+        color: surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.15 : 0.03),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -869,7 +1033,7 @@ class _AvailPill extends StatelessWidget {
           Text(
             label,
             style: GoogleFonts.dmSans(
-              color: _ts,
+              color: ts,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -885,14 +1049,15 @@ class _AvailPill extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _SectionLabel extends StatelessWidget {
   final String label;
-  const _SectionLabel({required this.label});
+  final Color tp;
+  const _SectionLabel({required this.label, required this.tp});
 
   @override
   Widget build(BuildContext context) {
     return Text(
       label,
       style: GoogleFonts.dmSans(
-        color: _tp,
+        color: tp,
         fontSize: 15,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.2,
@@ -902,12 +1067,13 @@ class _SectionLabel extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Bottom bar (extracted to keep build() clean)
+//  Bottom bar (bookmark removed — now lives in app bar)
 // ─────────────────────────────────────────────────────────────────────────────
 class _BottomBar extends StatelessWidget {
   final PostModel post;
-  final bool swapDone, starting, requesting;
-  final VoidCallback onMarkDone, onToggleSave, onRequestSwap, onStartChat;
+  final bool swapDone, starting, requesting, isDark;
+  final VoidCallback onMarkDone, onRequestSwap, onStartChat;
+  final Color surface, border, purple, ts, tl, green, cardBg, cardBd;
 
   const _BottomBar({
     required this.post,
@@ -915,22 +1081,30 @@ class _BottomBar extends StatelessWidget {
     required this.starting,
     required this.requesting,
     required this.onMarkDone,
-    required this.onToggleSave,
     required this.onRequestSwap,
     required this.onStartChat,
+    required this.surface,
+    required this.border,
+    required this.purple,
+    required this.ts,
+    required this.tl,
+    required this.green,
+    required this.cardBg,
+    required this.cardBd,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: _surface,
-        border: Border(top: BorderSide(color: _border)),
+      decoration: BoxDecoration(
+        color: surface,
+        border: Border(top: BorderSide(color: border)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x0D6C47FF),
+            color: purple.withOpacity(isDark ? 0.10 : 0.05),
             blurRadius: 20,
-            offset: Offset(0, -4),
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -949,11 +1123,13 @@ class _BottomBar extends StatelessWidget {
                   height: 46,
                   decoration: BoxDecoration(
                     color: swapDone
-                        ? _green.withOpacity(0.08)
-                        : const Color(0xFFF7F6FF),
+                        ? green.withOpacity(0.08)
+                        : (isDark
+                              ? const Color(0xFF1B1736)
+                              : const Color(0xFFF7F6FF)),
                     borderRadius: BorderRadius.circular(13),
                     border: Border.all(
-                      color: swapDone ? _green.withOpacity(0.45) : _border,
+                      color: swapDone ? green.withOpacity(0.45) : border,
                     ),
                   ),
                   child: Row(
@@ -963,14 +1139,14 @@ class _BottomBar extends StatelessWidget {
                         swapDone
                             ? Icons.check_circle_rounded
                             : Icons.check_circle_outline_rounded,
-                        color: swapDone ? _green : _tl,
+                        color: swapDone ? green : tl,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         swapDone ? 'Swap Done ✓' : 'Mark as Swap Done',
                         style: GoogleFonts.dmSans(
-                          color: swapDone ? _green : _ts,
+                          color: swapDone ? green : ts,
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                         ),
@@ -980,138 +1156,105 @@ class _BottomBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 9),
-              // Bookmark + action buttons row
-              Row(
+              // Action buttons row — no bookmark here anymore
+              Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Bookmark
+                  // Primary: Request Swap
                   GestureDetector(
-                    onTap: onToggleSave,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 50,
+                    onTap: requesting ? null : onRequestSwap,
+                    child: Container(
                       height: 52,
+                      width: double.infinity,
                       decoration: BoxDecoration(
-                        color: post.isBookmarked
-                            ? _purple.withOpacity(0.08)
-                            : _cardBg,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: post.isBookmarked
-                              ? _purple.withOpacity(0.45)
-                              : _cardBd,
-                          width: post.isBookmarked ? 1.5 : 1,
+                        gradient: LinearGradient(
+                          colors: [purple, const Color(0xFF9B7DFF)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
                         ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: purple.withOpacity(0.30),
+                            blurRadius: 16,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                      child: Icon(
-                        post.isBookmarked
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_outline_rounded,
-                        color: post.isBookmarked ? _purple : _ts,
-                        size: 21,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Primary: Request Swap
-                        GestureDetector(
-                          onTap: requesting ? null : onRequestSwap,
-                          child: Container(
-                            height: 52,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [_purple, Color(0xFF9B7DFF)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
+                      child: requesting
+                          ? const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
                               ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: _purple.withOpacity(0.30),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 5),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.swap_horiz_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 9),
+                                Text(
+                                  'Request Swap',
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
-                            child: requesting
-                                ? const Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.swap_horiz_rounded,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 9),
-                                      Text(
-                                        'Request Swap',
-                                        style: GoogleFonts.dmSans(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  // Secondary: Start Chat
+                  GestureDetector(
+                    onTap: starting ? null : onStartChat,
+                    child: Container(
+                      height: 40,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(color: cardBd),
+                      ),
+                      child: starting
+                          ? Center(
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  color: purple,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  color: ts,
+                                  size: 15,
+                                ),
+                                const SizedBox(width: 7),
+                                Text(
+                                  'Start Chat',
+                                  style: GoogleFonts.dmSans(
+                                    color: ts,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        // Secondary: Start Chat
-                        GestureDetector(
-                          onTap: starting ? null : onStartChat,
-                          child: Container(
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: _cardBg,
-                              borderRadius: BorderRadius.circular(13),
-                              border: Border.all(color: _cardBd),
+                                ),
+                              ],
                             ),
-                            child: starting
-                                ? const Center(
-                                    child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        color: _purple,
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.chat_bubble_outline_rounded,
-                                        color: _ts,
-                                        size: 15,
-                                      ),
-                                      const SizedBox(width: 7),
-                                      Text(
-                                        'Start Chat',
-                                        style: GoogleFonts.dmSans(
-                                          color: _ts,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ],
