@@ -719,7 +719,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
           // ── App bar ──────────────────────────────────────────────────────
           SliverAppBar(
             pinned: true,
-            backgroundColor: _sf,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, const Color(0xFF8B6CFF)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+            ),
+            backgroundColor: Colors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0,
             surfaceTintColor: Colors.transparent,
@@ -730,30 +739,56 @@ class _ExploreScreenState extends State<ExploreScreen> {
             title: Text(
               'Explore',
               style: GoogleFonts.dmSans(
-                color: _tp,
-                fontSize: 22,
+                color: Colors.white,
+                fontSize: 24,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.5,
               ),
             ),
             actions: [
-              _HeaderIconBtn(
-                icon: Icons.notifications_outlined,
-                dark: _d,
-                tp: _tp,
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OpenRequestsScreen()),
+                ),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(
+                    Icons.help_outline_rounded,
+                    size: 19,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              GestureDetector(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => const NotificationsScreen(),
                   ),
                 ),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_outlined,
+                    size: 19,
+                    color: Colors.white,
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
             ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Divider(height: 1, thickness: 1, color: _bd),
-            ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 12)),

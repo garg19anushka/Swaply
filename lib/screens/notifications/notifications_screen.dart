@@ -247,25 +247,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   // ── header ─────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Consumer<NotificationService>(
-      builder: (_, svc, __) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+      builder: (_, svc, __) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [_purple, const Color(0xFF8B6CFF)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
         child: Row(
           children: [
             // back button
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: _chipBg,
-                  borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: _bd),
+                  color: Colors.white.withOpacity(0.22),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(
-                  Icons.chevron_left_rounded,
-                  color: _d ? Colors.white70 : const Color(0xFF5E5A80),
-                  size: 22,
+                child: const Center(
+                  child: Icon(
+                    Icons.chevron_left_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ),
@@ -276,9 +284,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Text(
                     'Notifications',
                     style: GoogleFonts.dmSans(
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: _tp,
+                      color: Colors.white,
                     ),
                   ),
                   if (svc.unreadCount > 0) ...[
@@ -289,7 +297,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: _purple,
+                        color: Colors.white.withOpacity(0.22),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -313,7 +321,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   style: GoogleFonts.dmSans(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: _purple,
+                    color: Colors.white,
                   ),
                 ),
               ),

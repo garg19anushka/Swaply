@@ -73,28 +73,51 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               // ── App bar ────────────────────────────────────────────
               SliverAppBar(
                 pinned: true,
-                backgroundColor: _sf,
+                flexibleSpace: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, const Color(0xFF8B6CFF)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                  ),
+                ),
+                backgroundColor: Colors.transparent,
                 elevation: 0,
                 scrolledUnderElevation: 0,
                 surfaceTintColor: Colors.transparent,
-                leading: IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: _tp,
-                    size: 19,
+                titleSpacing: 0,
+                leadingWidth: 58,
+                leading: Center(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.chevron_left_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
                   ),
-                  onPressed: () => Navigator.pop(context),
                 ),
                 title: Text(
                   'Leaderboard',
                   style: GoogleFonts.dmSans(
-                    color: _tp,
-                    fontSize: 18,
+                    color: Colors.white,
+                    fontSize: 21,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.4,
                   ),
                 ),
-                centerTitle: true,
+                centerTitle: false,
                 actions: [
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
@@ -102,21 +125,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
+                        color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
                         Icons.emoji_events_rounded,
-                        color: AppColors.primary,
+                        color: Colors.white,
                         size: 20,
                       ),
                     ),
                   ),
                 ],
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(1),
-                  child: Divider(height: 1, thickness: 1, color: _bd),
-                ),
               ),
 
               // ── Main tabs: Overall / By Category ──────────────────

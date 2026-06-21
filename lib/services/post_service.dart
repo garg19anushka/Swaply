@@ -81,19 +81,33 @@ class PostService extends ChangeNotifier {
   }
 
   // ── fetch open requests ────────────────────────────────────────────────────
-  Future<void> fetchOpenRequests() async {
+  // By default only shows ACTIVE (unresolved) requests — once a request is
+  // marked resolved it drops out of this list so the feed doesn't fill up
+  // with already-helped requests. Pass includeResolved: true to see everything
+  // (e.g. for a "my past requests" view).
+  Future<void> fetchOpenRequests({bool includeResolved = false}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
       await _loadBookmarkedIds();
 
-      final rows = await _supabase
+      var filterQuery = _supabase
           .from('posts')
           .select('*, $_profileSelect')
-          .eq('is_open_request', true)
-          .order('created_at', ascending: false);
+          .eq('is_open_request', true);
 
+      if (!includeResolved) {
+        filterQuery = filterQuery.eq('is_resolved', false);
+      }
+
+      final rows = await filterQuery.order('created_at', ascending: false);
+
+      // Expired requests (auto-set at creation, see createPost) drop out
+      // of the active list the same way resolved ones do — old asks that
+      // were never helped shouldn't sit in the feed indefinitely. Posts
+      // created before this feature existed have expiresAt == null, and
+      // isExpired correctly returns false for those, so they're unaffected.
       _openRequests = (rows as List)
           .map(
             (r) => PostModel.fromMap(
@@ -101,12 +115,105 @@ class PostService extends ChangeNotifier {
               isBookmarked: _bookmarkedIds.contains(r['id']),
             ),
           )
+          .where((p) => includeResolved || !p.isExpired)
           .toList();
     } catch (e) {
       debugPrint('PostService.fetchOpenRequests error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  // ── mark an open request as resolved ────────────────────────────────────
+  // Only the post's own author should call this (enforce with RLS too).
+  // Updates Supabase, then removes the post from the local _openRequests
+  // list so the UI reflects it immediately without a full refetch.
+  //
+  // Also awards credit to whoever helped: the FIRST person who started a
+  // chat from this post (the earliest row in chat_swap_banners for this
+  // post_id) gets their profiles.total_swaps incremented by 1 — the same
+  // number the leaderboard score formula already reads, so helping with
+  // an open request now counts toward leaderboard rank exactly like
+  // completing a regular swap does.
+  Future<bool> markPostResolved(String postId) async {
+    try {
+      await _supabase
+          .from('posts')
+          .update({'is_resolved': true})
+          .eq('id', postId);
+
+      await _awardHelperCredit(postId);
+
+      _openRequests = _openRequests.where((p) => p.id != postId).toList();
+      _posts = _posts
+          .map((p) => p.id == postId ? p.copyWith(isResolved: true) : p)
+          .toList();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('PostService.markPostResolved error: $e');
+      return false;
+    }
+  }
+
+  // Finds the earliest chat_swap_banners row for this post (i.e. whoever
+  // started a chat from it first) and bumps that user's total_swaps by 1.
+  // Failure here is logged but never blocks the resolve action itself —
+  // the request still gets marked resolved even if credit can't be
+  // awarded for some reason (e.g. nobody ever started a chat on it).
+  Future<void> _awardHelperCredit(String postId) async {
+    try {
+      final earliest = await _supabase
+          .from('chat_swap_banners')
+          .select('created_by')
+          .eq('post_id', postId)
+          .order('created_at', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      final helperId = earliest?['created_by'] as String?;
+      if (helperId == null) return;
+
+      // Don't award credit if the asker is somehow resolving their own
+      // post as if they'd helped themselves (shouldn't normally happen,
+      // since the asker wouldn't start a chat from their own post, but
+      // guards against bad data).
+      final post = await _supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .single();
+      if (helperId == post['user_id']) return;
+
+      final profile = await _supabase
+          .from('profiles')
+          .select('total_swaps')
+          .eq('id', helperId)
+          .single();
+      final current = (profile['total_swaps'] ?? 0) as int;
+
+      await _supabase
+          .from('profiles')
+          .update({'total_swaps': current + 1})
+          .eq('id', helperId);
+    } catch (e) {
+      debugPrint('PostService._awardHelperCredit error: $e');
+    }
+  }
+
+  // ── reopen a previously resolved request ────────────────────────────────
+  Future<bool> reopenPost(String postId) async {
+    try {
+      await _supabase
+          .from('posts')
+          .update({'is_resolved': false})
+          .eq('id', postId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('PostService.reopenPost error: $e');
+      return false;
     }
   }
 
@@ -177,6 +284,17 @@ class PostService extends ChangeNotifier {
     if (_uid == null) return null;
 
     try {
+      // Open requests get an automatic expiry so stale asks naturally
+      // drop off rather than sitting in the list forever — "Urgent"
+      // requests expire sooner (3 days) than the general default (14
+      // days), reusing the same Urgency tags already captured on the
+      // create-post form rather than adding a separate expiry picker.
+      DateTime? expiresAt;
+      if (isOpenRequest) {
+        final isUrgent = tags.contains('Urgent');
+        expiresAt = DateTime.now().add(Duration(days: isUrgent ? 3 : 14));
+      }
+
       final row = await _supabase
           .from('posts')
           .insert({
@@ -189,6 +307,7 @@ class PostService extends ChangeNotifier {
             'custom_offer': customOffer,
             'tags': tags,
             'is_open_request': isOpenRequest,
+            'expires_at': expiresAt?.toIso8601String(),
             'bookmarks_count': 0,
             'swap_count': 0,
           })

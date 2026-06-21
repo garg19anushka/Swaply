@@ -11,8 +11,10 @@ import '../../models/chat_model.dart';
 import '../../models/post_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/swap_banner_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/avatar_widget.dart';
+import '../posts/post_detail_screen.dart';
 import '../profile/user_profile_screen.dart';
 import 'rate_swap_screen.dart';
 
@@ -48,15 +50,24 @@ class _ChatScreenState extends State<ChatScreen> {
   MessageModel? _replyTarget;
   String? _selectedMsgId;
 
-  // The post this chat originated from — loaded from Supabase for BOTH users,
-  // not just the one who clicked "Start a Chat". This makes the banner visible
-  // to both participants permanently.
-  PostModel? _sourcePost;
+  // Every "Started from swap" banner for this chat — one entry per
+  // distinct post the two participants have opened a chat from.
+  // Loaded fresh from `chat_swap_banners` on every open, so both users
+  // always see the identical, full list, in the order they were created.
+  List<BannerWithPost> _banners = [];
 
-  // Index after which the swap banner is inserted.
-  // Loaded from Supabase (banner_after_index column on chats table).
-  // Saved once on first open from a swap, then read by both users forever.
-  int? _bannerAfterIndex;
+  // Precomputed: for a given "messages seen so far" count, how many
+  // banners are anchored right there. Rebuilt whenever _banners changes.
+  Map<int, List<BannerWithPost>> _bannersByAnchor = {};
+
+  void _setBanners(List<BannerWithPost> banners) {
+    final grouped = <int, List<BannerWithPost>>{};
+    for (final b in banners) {
+      grouped.putIfAbsent(b.banner.messageIndexAtCreation, () => []).add(b);
+    }
+    _banners = banners;
+    _bannersByAnchor = grouped;
+  }
 
   // ── theme shortcuts ──────────────────────────────────────────
   bool get _d => Theme.of(context).brightness == Brightness.dark;
@@ -84,34 +95,29 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     final cs = context.read<ChatService>();
 
-    // Load messages first, then handle banner logic
     cs.fetchMessages(widget.chat.id).then((_) async {
       if (!mounted) return;
 
-      // ── Case 1: Opened from Skill Details (user clicked "Start a Chat") ──
-      // Save banner index to Supabase once so the other user also sees it.
+      // ── Opened from a post's "Start a Chat" button ──────────────
+      // Create (or no-op if it already exists) a banner row for THIS
+      // post specifically. This never touches any other post's banner
+      // for the same chat — that's what makes stacking work.
       if (widget.sourcePost != null) {
-        final idx = cs.messages.length;
-        await cs.saveBannerIndex(chatId: widget.chat.id, messageCount: idx);
-        if (mounted) {
-          setState(() {
-            _sourcePost = widget.sourcePost;
-            // Re-read from DB to get the saved value (handles race conditions)
-            _bannerAfterIndex = widget.chat.bannerAfterIndex ?? idx;
-          });
-        }
+        await SwapBannerService.instance.ensureBannerForPost(
+          chatId: widget.chat.id,
+          postId: widget.sourcePost!.id,
+        );
       }
 
-      // ── Case 2: Opened from chat list (both users on every reopen) ──
-      // Load the post and banner index from Supabase if the chat has a post_id.
-      if (widget.sourcePost == null && widget.chat.postId != null) {
-        final postData = await cs.fetchPostForChat(widget.chat.id);
-        if (postData != null && mounted) {
-          setState(() {
-            _sourcePost = PostModel.fromMap(postData);
-            _bannerAfterIndex = widget.chat.bannerAfterIndex;
-          });
-        }
+      // ── Always load the FULL list of banners for this chat ──────
+      // Runs whether opened from a post or from the chat list, and
+      // whether sourcePost was just-created or already existed — so
+      // both participants always see every banner, every time.
+      final banners = await SwapBannerService.instance.fetchBannersWithPosts(
+        widget.chat.id,
+      );
+      if (mounted) {
+        setState(() => _setBanners(banners));
       }
 
       if (mounted) _scrollToBottom();
@@ -1180,17 +1186,28 @@ class _ChatScreenState extends State<ChatScreen> {
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 6, 16, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 16, 10),
                   child: Row(
                     children: [
                       // Back
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: _tp,
-                          size: 19,
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.chevron_left_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
                         ),
-                        onPressed: () => Navigator.pop(context),
                       ),
 
                       // Avatar → profile
@@ -1233,7 +1250,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 style: GoogleFonts.dmSans(
                                   color: _tp,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 15,
+                                  fontSize: 17,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1366,29 +1383,48 @@ class _ChatScreenState extends State<ChatScreen> {
                           8,
                         ),
                         physics: const BouncingScrollPhysics(),
-                        itemCount:
-                            cs.messages.length +
-                            (_bannerAfterIndex != null ? 1 : 0),
+                        itemCount: cs.messages.length + _banners.length,
                         itemBuilder: (_, i) {
-                          // ── Swap context banner pinned at fixed position ──
-                          // Inserted after _bannerAfterIndex messages (the count
-                          // when the chat was first opened from a swap).
-                          // New messages appear below the banner, old ones above.
-                          if (_bannerAfterIndex != null &&
-                              i == _bannerAfterIndex &&
-                              _sourcePost != null) {
-                            return _SwapContextBanner(
-                              post: _sourcePost!,
-                              isDark: _d,
-                            );
+                          // ── Swap context banners, stacked at their anchors ──
+                          // Walk virtual slots: at each "messages seen" count,
+                          // first emit every banner anchored there (in creation
+                          // order), then emit the next real message. This lets
+                          // multiple posts opened with the same person each get
+                          // their own permanent banner instead of one replacing
+                          // another.
+                          int msgIndex = 0;
+                          int bannersRenderedHere = 0;
+                          int slot = 0;
+                          while (true) {
+                            final bannersHere =
+                                _bannersByAnchor[msgIndex] ?? const [];
+                            if (bannersRenderedHere < bannersHere.length) {
+                              if (slot == i) {
+                                final bp = bannersHere[bannersRenderedHere];
+                                final post = PostModel.fromMap(bp.post);
+                                return _SwapContextBanner(
+                                  post: post,
+                                  isDark: _d,
+                                );
+                              }
+                              bannersRenderedHere++;
+                              slot++;
+                              continue;
+                            }
+                            if (slot == i || msgIndex >= cs.messages.length) {
+                              break;
+                            }
+                            msgIndex++;
+                            bannersRenderedHere = 0;
+                            slot++;
+                          }
+                          if (msgIndex >= cs.messages.length) {
+                            // Safety net: ran out of real messages (e.g. a
+                            // message was deleted after a banner anchored
+                            // past it). Render nothing rather than crash.
+                            return const SizedBox.shrink();
                           }
 
-                          // Shift real message index down by 1 for items after banner
-                          final msgIndex =
-                              (_bannerAfterIndex != null &&
-                                  i > _bannerAfterIndex!)
-                              ? i - 1
-                              : i;
                           final msg = cs.messages[msgIndex];
                           final isMe = msg.senderId == myId;
                           if (msg.messageType == 'system') {
@@ -2032,105 +2068,132 @@ class _SwapContextBanner extends StatelessWidget {
     final wantBdr = d ? const Color(0xFFFF6B6B33) : const Color(0xFFF4B8B8);
     final divClr = d ? const Color(0xFF2A2540) : const Color(0xFFDDD8FF);
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(4, 8, 4, 12),
-      decoration: BoxDecoration(
-        color: bannerBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: bannerBdr, width: 1),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.swap_horiz_rounded,
-                      color: Color(0xFF7C5CFC),
-                      size: 18,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(4, 8, 4, 12),
+        decoration: BoxDecoration(
+          color: bannerBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: bannerBdr, width: 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.swap_horiz_rounded,
+                        color: Color(0xFF7C5CFC),
+                        size: 18,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
 
-                // Text block
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Started from swap',
-                        style: GoogleFonts.dmSans(
-                          color: labelClr,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        post.title,
-                        style: GoogleFonts.dmSans(
-                          color: titleClr,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      // Pills row
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          _BannerPill(
-                            label: 'Offers: ${post.skillOffered}',
-                            bg: offerBg,
-                            textColor: offerText,
-                            border: offerBdr,
+                  // Text block
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Started from swap',
+                          style: GoogleFonts.dmSans(
+                            color: labelClr,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
                           ),
-                          if (post.skillWanted != null &&
-                              post.skillWanted!.isNotEmpty)
-                            _BannerPill(
-                              label: 'Wants: ${post.skillWanted!}',
-                              bg: wantBg,
-                              textColor: wantText,
-                              border: wantBdr,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                post.title,
+                                style: GoogleFonts.dmSans(
+                                  color: titleClr,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.3,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                        ],
-                      ),
-                    ],
+                            if (post.profile?.displayName != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                'by ${post.profile!.displayName}',
+                                style: GoogleFonts.dmSans(
+                                  color: titleClr.withOpacity(0.65),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        // Pills row
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            _BannerPill(
+                              label: 'Offers: ${post.skillOffered}',
+                              bg: offerBg,
+                              textColor: offerText,
+                              border: offerBdr,
+                            ),
+                            if (post.skillWanted != null &&
+                                post.skillWanted!.isNotEmpty)
+                              _BannerPill(
+                                label: 'Wants: ${post.skillWanted!}',
+                                bg: wantBg,
+                                textColor: wantText,
+                                border: wantBdr,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // Bottom divider
-          Container(
-            height: 1,
-            decoration: BoxDecoration(
-              color: divClr,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(14),
-                bottomRight: Radius.circular(14),
+                ],
               ),
             ),
-          ),
-        ],
+            // Bottom divider
+            Container(
+              height: 1,
+              decoration: BoxDecoration(
+                color: divClr,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(14),
+                  bottomRight: Radius.circular(14),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -50,6 +50,7 @@ class PostModel {
   final String exchangeType;
   final String? customOffer;
   final bool isOpenRequest;
+  final bool isResolved;
   final bool isBookmarked;
   final DateTime createdAt;
   final DateTime? expiresAt; // used by expiry notifications + Edge Function
@@ -68,6 +69,7 @@ class PostModel {
     this.exchangeType = 'barter',
     this.customOffer,
     this.isOpenRequest = false,
+    this.isResolved = false,
     this.isBookmarked = false,
     required this.createdAt,
     this.expiresAt,
@@ -103,6 +105,7 @@ class PostModel {
       exchangeType: map['exchange_type'] ?? 'barter',
       customOffer: map['custom_offer'],
       isOpenRequest: map['is_open_request'] ?? false,
+      isResolved: map['is_resolved'] ?? false,
       isBookmarked: isBookmarked,
       createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
       expiresAt: map['expires_at'] != null
@@ -114,6 +117,7 @@ class PostModel {
 
   PostModel copyWith({
     bool? isBookmarked,
+    bool? isResolved,
     int? bookmarksCount,
     DateTime? expiresAt,
     ProfileModel? profile,
@@ -131,6 +135,7 @@ class PostModel {
       exchangeType: exchangeType,
       customOffer: customOffer,
       isOpenRequest: isOpenRequest,
+      isResolved: isResolved ?? this.isResolved,
       isBookmarked: isBookmarked ?? this.isBookmarked,
       createdAt: createdAt,
       expiresAt: expiresAt ?? this.expiresAt,

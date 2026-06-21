@@ -353,10 +353,13 @@ class _CreatePostScreenState extends State<CreatePostScreen>
                               key: const ValueKey('barter'),
                               ctrl: _skillWantedCtrl,
                               focus: _skillWantedFocus,
-                              hint: 'Skill I want in return',
+                              hint: _isOpenRequest
+                                  ? 'Skill I want in return (optional)'
+                                  : 'Skill I want in return',
                               icon: Icons.swap_horiz_rounded,
                               validator: (v) =>
-                                  _exchangeType == 'barter' &&
+                                  !_isOpenRequest &&
+                                      _exchangeType == 'barter' &&
                                       (v == null || v.trim().isEmpty)
                                   ? 'Please enter the skill you want'
                                   : null,
@@ -365,10 +368,13 @@ class _CreatePostScreenState extends State<CreatePostScreen>
                               key: const ValueKey('custom'),
                               ctrl: _customOfferCtrl,
                               focus: _customOfferFocus,
-                              hint: 'Your custom offer (e.g. ₹200, Coffee)',
+                              hint: _isOpenRequest
+                                  ? 'Your custom offer (optional)'
+                                  : 'Your custom offer (e.g. ₹200, Coffee)',
                               icon: Icons.card_giftcard_rounded,
                               validator: (v) =>
-                                  _exchangeType == 'custom' &&
+                                  !_isOpenRequest &&
+                                      _exchangeType == 'custom' &&
                                       (v == null || v.trim().isEmpty)
                                   ? 'Please describe your custom offer'
                                   : null,
@@ -423,24 +429,20 @@ class _CreatePostScreenState extends State<CreatePostScreen>
           end: Alignment.centerRight,
         ),
       ),
-      padding: EdgeInsets.only(top: topPad, left: 4, right: 16, bottom: 18),
+      padding: EdgeInsets.only(
+        top: topPad + 24,
+        left: 20,
+        right: 16,
+        bottom: 16,
+      ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(
-              Icons.chevron_left_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-            onPressed: () => Navigator.maybePop(context),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
           Expanded(
             child: Text(
               isEdit ? 'Edit Post' : 'Create Swap Post',
               style: GoogleFonts.dmSans(
                 color: Colors.white,
-                fontSize: 17,
+                fontSize: 20,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
               ),

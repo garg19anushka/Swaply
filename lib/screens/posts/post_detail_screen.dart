@@ -34,6 +34,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   bool _starting = false;
   bool _requesting = false;
   bool _swapDone = false;
+  bool _markingResolved = false;
+  late bool _isResolved;
+
+  @override
+  void initState() {
+    super.initState();
+    _isResolved = widget.post.isResolved;
+  }
 
   PostModel get post => widget.post;
 
@@ -167,6 +175,139 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     await context.read<PostService>().toggleBookmark(post.id);
   }
 
+  // ── Mark this open request as resolved ─────────────────────────────────
+  // Only shown to the post's own author, only for open requests. Persists
+  // to Supabase via PostService, then updates local state so the badge and
+  // button flip immediately without needing to leave the screen.
+  Future<void> _markResolved() async {
+    if (_markingResolved || _isResolved) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Mark as resolved?',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'This will remove your request from the Open Requests list. '
+          'People can no longer find it to offer help.',
+          style: GoogleFonts.dmSans(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Mark Resolved'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _markingResolved = true);
+    HapticFeedback.mediumImpact();
+    final ok = await context.read<PostService>().markPostResolved(post.id);
+    if (!mounted) return;
+    setState(() {
+      _markingResolved = false;
+      if (ok) _isResolved = true;
+    });
+    if (ok) {
+      _snack('Marked as resolved — thanks for letting people know!');
+    } else {
+      _snack('Could not update. Please try again.');
+    }
+  }
+
+  // ── Bottom bar shown to the author of their own open request ───────────
+  Widget _buildResolveBar() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        MediaQuery.of(context).padding.bottom + 14,
+      ),
+      decoration: BoxDecoration(
+        color: _surface,
+        border: Border(top: BorderSide(color: _border)),
+      ),
+      child: _isResolved
+          ? Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: _green, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Resolved — no longer visible in Open Requests',
+                    style: GoogleFonts.dmSans(
+                      color: _green,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : GestureDetector(
+              onTap: _markingResolved ? null : _markResolved,
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: _markingResolved
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.task_alt_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Mark as Resolved',
+                              style: GoogleFonts.dmSans(
+                                color: Colors.white,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+    );
+  }
+
   void _markSwapDone() {
     HapticFeedback.mediumImpact();
     setState(() => _swapDone = !_swapDone);
@@ -219,35 +360,41 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: _surface,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_purple, const Color(0xFF8B6CFF)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        scrolledUnderElevation: 0.5,
-        shadowColor: _border,
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
+        titleSpacing: 0,
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Container(
-              decoration: BoxDecoration(
-                color: _bg,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _border),
-              ),
-              child: Icon(Icons.chevron_left_rounded, color: _tp, size: 22),
+          child: const Padding(
+            padding: EdgeInsets.all(10),
+            child: Icon(
+              Icons.chevron_left_rounded,
+              color: Colors.white,
+              size: 24,
             ),
           ),
         ),
         title: Text(
           'Skill Details',
           style: GoogleFonts.dmSans(
-            color: _tp,
-            fontSize: 16,
+            color: Colors.white,
+            fontSize: 19,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.3,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         // ── Bookmark moved here, top-right corner ───────────────────────────
         actions: [
           GestureDetector(
@@ -259,12 +406,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: post.isBookmarked ? _purple.withOpacity(0.10) : _bg,
+                  color: post.isBookmarked
+                      ? Colors.white.withOpacity(0.20)
+                      : Colors.white.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: post.isBookmarked
-                        ? _purple.withOpacity(0.45)
-                        : _border,
+                    color: Colors.white.withOpacity(
+                      post.isBookmarked ? 0.6 : 0.3,
+                    ),
                     width: post.isBookmarked ? 1.5 : 1,
                   ),
                 ),
@@ -272,21 +421,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   post.isBookmarked
                       ? Icons.bookmark_rounded
                       : Icons.bookmark_outline_rounded,
-                  color: post.isBookmarked ? _purple : _ts,
+                  color: Colors.white,
                   size: 19,
                 ),
               ),
             ),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: _border),
-        ),
       ),
 
       bottomNavigationBar: isOwn
-          ? null
+          ? (post.isOpenRequest ? _buildResolveBar() : null)
           : _BottomBar(
               post: post,
               swapDone: _swapDone,
@@ -311,14 +456,29 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Hero header — gradient banner ─────────────────────────────
+            // ── Tags — now shown above the hero banner ─────────────────
+            if (post.tags.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: _TagRow(
+                  post: post,
+                  purple: _purple,
+                  amber: _amber,
+                  teal: _teal,
+                  green: _green,
+                ),
+              ),
+
+            // ── Hero header — flat background, no gradient ───────────────
             _HeroBanner(
               post: post,
               isDark: _d,
+              bg: _bg,
               border: _border,
               tp: _tp,
               tl: _tl,
               amber: _amber,
+              isResolvedOverride: _isResolved,
             ),
 
             Padding(
@@ -326,17 +486,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Tags ─────────────────────────────────────────────
-                  if (post.tags.isNotEmpty) ...[
-                    _TagRow(
-                      post: post,
-                      purple: _purple,
-                      amber: _amber,
-                      teal: _teal,
-                      green: _green,
-                    ),
-                    const SizedBox(height: 18),
-                  ],
+                  // ── Author card — shown first, right after the title ──
+                  _AuthorCard(
+                    post: post,
+                    surface: _surface,
+                    border: _border,
+                    tp: _tp,
+                    ts: _ts,
+                    tl: _tl,
+                    amber: _amber,
+                    isDark: _d,
+                  ).animate().fadeIn(delay: 80.ms),
+                  const SizedBox(height: 20),
 
                   // ── Skill exchange card ───────────────────────────────
                   _ExchangeCard(
@@ -353,21 +514,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         wantBoxBd: _wantBoxBd,
                       )
                       .animate()
-                      .fadeIn(delay: 80.ms)
-                      .slideY(begin: 0.04, delay: 80.ms),
-                  const SizedBox(height: 20),
-
-                  // ── Author card ───────────────────────────────────────
-                  _AuthorCard(
-                    post: post,
-                    surface: _surface,
-                    border: _border,
-                    tp: _tp,
-                    ts: _ts,
-                    tl: _tl,
-                    amber: _amber,
-                    isDark: _d,
-                  ).animate().fadeIn(delay: 120.ms),
+                      .fadeIn(delay: 120.ms)
+                      .slideY(begin: 0.04, delay: 120.ms),
                   const SizedBox(height: 20),
 
                   // ── About ─────────────────────────────────────────────
@@ -453,14 +601,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 class _HeroBanner extends StatelessWidget {
   final PostModel post;
   final bool isDark;
-  final Color border, tp, tl, amber;
+  final Color bg, border, tp, tl, amber;
+  final bool? isResolvedOverride;
   const _HeroBanner({
     required this.post,
     required this.isDark,
+    required this.bg,
     required this.border,
     required this.tp,
     required this.tl,
     required this.amber,
+    this.isResolvedOverride,
   });
 
   @override
@@ -468,21 +619,7 @@ class _HeroBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [
-                  const Color(0xFF241D52),
-                  const Color(0xFF3A1830),
-                  const Color(0xFF0A0815),
-                ]
-              : [
-                  const Color(0xFFEDE8FF),
-                  const Color(0xFFFFF0F3),
-                  const Color(0xFFF7F6FF),
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: bg,
         border: Border(bottom: BorderSide(color: border)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
@@ -490,29 +627,44 @@ class _HeroBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (post.isOpenRequest)
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: amber.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: amber.withOpacity(0.45)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock_open_rounded, size: 12, color: amber),
-                  const SizedBox(width: 5),
-                  Text(
-                    'Open Request',
-                    style: GoogleFonts.dmSans(
-                      color: amber,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
+            Builder(
+              builder: (_) {
+                final resolved = isResolvedOverride ?? post.isResolved;
+                final clr = resolved ? tl : amber;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
                   ),
-                ],
-              ),
+                  decoration: BoxDecoration(
+                    color: clr.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: clr.withOpacity(0.45)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        resolved
+                            ? Icons.check_circle_rounded
+                            : Icons.lock_open_rounded,
+                        size: 12,
+                        color: clr,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        resolved ? 'Resolved' : 'Open Request',
+                        style: GoogleFonts.dmSans(
+                          color: clr,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           Text(
             post.title,

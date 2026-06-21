@@ -130,7 +130,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   style: GoogleFonts.dmSans(
                     // FIX 1: _textMain is NOT const — use literal white here
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.1,
                   ),

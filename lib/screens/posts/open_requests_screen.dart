@@ -31,12 +31,28 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
   Color get _ts => _d ? AppColors.darkTextSecondary : AppColors.textSecondary;
   Color get _tl => _d ? const Color(0xFF555575) : AppColors.textLight;
 
+  // Urgency tags from create_post_screen.dart's "Urgency" category. Filters
+  // the list client-side by matching against each post's tags — no new
+  // query needed since tags are already fetched with every post.
+  static const _urgencyOptions = [
+    'Urgent',
+    'Quick Help',
+    'Flexible Timeline',
+    'Long-term',
+  ];
+  String? _activeUrgency; // null = show all
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PostService>().fetchOpenRequests();
     });
+  }
+
+  List<PostModel> _filtered(List<PostModel> requests) {
+    if (_activeUrgency == null) return requests;
+    return requests.where((p) => p.tags.contains(_activeUrgency)).toList();
   }
 
   void _openDetail(PostModel p) {
@@ -99,6 +115,45 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
     }
   }
 
+  Future<void> _markResolved(String postId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Mark as resolved?',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'This will remove it from the Open Requests list.',
+          style: GoogleFonts.dmSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.dmSans(color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Mark Resolved',
+              style: GoogleFonts.dmSans(
+                color: AppColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await context.read<PostService>().markPostResolved(postId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final myId = context.watch<AuthService>().currentUser?.id;
@@ -108,45 +163,72 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // ── Header ─────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Container(
-              color: _sf,
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top,
-                left: 4,
-                right: 16,
-                bottom: 14,
+          // ── App bar ────────────────────────────────────────────
+          SliverAppBar(
+            pinned: true,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, const Color(0xFF8B6CFF)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 18,
-                          color: _tp,
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      Text(
-                        'Open Requests',
-                        style: GoogleFonts.dmSans(
-                          color: _tp,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                    ],
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            titleSpacing: 0,
+            leadingWidth: 58,
+            leading: Center(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.22),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  Divider(height: 1, thickness: 1, color: _bd),
-                ],
+                  child: const Center(
+                    child: Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
               ),
-            ).animate().fadeIn(duration: 300.ms),
+            ),
+            title: Text(
+              'Open Requests',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            centerTitle: false,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.help_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // ── Info banner ─────────────────────────────────────────────────
@@ -190,6 +272,63 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
             ).animate().fadeIn(delay: 50.ms),
           ),
 
+          // ── Urgency filter chips ──────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                physics: const BouncingScrollPhysics(),
+                itemCount: _urgencyOptions.length + 1, // +1 for "All"
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final isAll = i == 0;
+                  final label = isAll ? 'All' : _urgencyOptions[i - 1];
+                  final active = isAll
+                      ? _activeUrgency == null
+                      : _activeUrgency == label;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _activeUrgency = isAll ? null : label);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? const Color(0xFF7C5CFC)
+                            : (_d
+                                  ? const Color(0xFF1A1A2C)
+                                  : const Color(0xFFF3F3F8)),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: active
+                              ? const Color(0xFF7C5CFC)
+                              : const Color(0xFF7C5CFC).withOpacity(0.25),
+                          width: 1,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: GoogleFonts.dmSans(
+                            color: active
+                                ? Colors.white
+                                : (_d ? _ts : AppColors.textSecondary),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+
           // ── Content ─────────────────────────────────────────────────────
           Consumer<PostService>(
             builder: (_, ps, __) {
@@ -206,7 +345,7 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
                 );
               }
 
-              // Empty state
+              // Empty state — no requests exist at all
               if (ps.openRequests.isEmpty) {
                 return SliverFillRemaining(
                   child: Center(
@@ -245,12 +384,53 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
                 );
               }
 
+              final filteredRequests = _filtered(ps.openRequests);
+
+              // Empty state — requests exist, but none match the active filter
+              if (filteredRequests.isEmpty) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.filter_alt_off_rounded,
+                          size: 40,
+                          color: _tl,
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'No "$_activeUrgency" requests right now',
+                          style: GoogleFonts.dmSans(
+                            color: _tp,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        GestureDetector(
+                          onTap: () => setState(() => _activeUrgency = null),
+                          child: Text(
+                            'Clear filter',
+                            style: GoogleFonts.dmSans(
+                              color: const Color(0xFF7C5CFC),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ).animate().fadeIn(),
+                  ),
+                );
+              }
+
               // Requests list — feed-identical SwapPostCard
               return SliverPadding(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((_, i) {
-                    final p = ps.openRequests[i];
+                    final p = filteredRequests[i];
                     return SwapPostCard(
                           key: ValueKey(p.id),
                           post: p,
@@ -265,6 +445,7 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
                             ),
                           ),
                           onDelete: () => _deletePost(p.id),
+                          onMarkResolved: () => _markResolved(p.id),
                         )
                         .animate()
                         .fadeIn(delay: Duration(milliseconds: i * 55))
@@ -273,7 +454,7 @@ class _OpenRequestsScreenState extends State<OpenRequestsScreen> {
                           delay: Duration(milliseconds: i * 55),
                           curve: Curves.easeOutCubic,
                         );
-                  }, childCount: ps.openRequests.length),
+                  }, childCount: filteredRequests.length),
                 ),
               );
             },
@@ -295,6 +476,7 @@ class SwapPostCard extends StatefulWidget {
   final bool isOwn;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
+  final VoidCallback? onMarkResolved;
 
   const SwapPostCard({
     super.key,
@@ -305,6 +487,7 @@ class SwapPostCard extends StatefulWidget {
     this.isOwn = false,
     this.onDelete,
     this.onEdit,
+    this.onMarkResolved,
   });
 
   @override
@@ -386,8 +569,13 @@ class _SwapPostCardState extends State<SwapPostCard>
     return '${diff.inDays}d ago';
   }
 
+  // Uses the real expires_at on the post when present (set automatically
+  // for open requests in PostService.createPost). Falls back to the old
+  // 7-day-from-creation estimate for posts that predate this field.
   int get _daysLeft {
-    final expiry = widget.post.createdAt.add(const Duration(days: 7));
+    final expiry =
+        widget.post.expiresAt ??
+        widget.post.createdAt.add(const Duration(days: 7));
     return expiry.difference(DateTime.now()).inDays.clamp(0, 99);
   }
 
@@ -778,6 +966,14 @@ class _SwapPostCardState extends State<SwapPostCard>
       ),
       const Spacer(),
       if (widget.isOwn) ...[
+        if (widget.post.isOpenRequest && !widget.post.isResolved) ...[
+          _SmallBtn(
+            icon: Icons.task_alt_rounded,
+            color: AppColors.success,
+            onTap: widget.onMarkResolved ?? () {},
+          ),
+          const SizedBox(width: 8),
+        ],
         _SmallBtn(
           icon: Icons.edit_outlined,
           color: AppColors.primary,
